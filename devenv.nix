@@ -23,9 +23,12 @@
   # services.postgres.enable = true;
 
   # https://devenv.sh/scripts/
-  scripts.hello.exec = ''
-    echo hello from $GREET
-  '';
+  scripts = {
+    hello.exec = ''
+      echo hello from $GREET
+    '';
+    prost-cli.exec = ''uv run prost-cli "$@"'';
+  };
 
   # https://devenv.sh/basics/
   enterShell = ''
