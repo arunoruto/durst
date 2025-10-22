@@ -1,16 +1,7 @@
-import click
 from textual.app import App, ComposeResult
 from textual.widgets import DataTable, Footer, Header
 
 from prost.db import get_recent_purchases, setup_database
-
-# Hardcode data for now to test the UI in isolation
-DRINKS_DATA = [
-    ("User", "Drink", "Timestamp"),
-    ("Anna", "Club-Mate", "2025-10-22 17:00"),
-    ("Ben", "Fritz-Kola", "2025-10-22 17:05"),
-    ("Carla", "Apfelschorle", "2025-10-22 17:10"),
-]
 
 
 class ProstApp(App):
@@ -63,12 +54,7 @@ class ProstApp(App):
             table.add_rows(rows)
 
 
-@click.command()
-@click.option("--db", default="sqlite.db", help="Location of the database")
-def tui(db: str) -> None:
-    app = ProstApp(db_file=db)
-    app.run()
-
-
 if __name__ == "__main__":
-    tui()
+    print("This is the CLI implementation. Please run the binary!")
+    # app = ProstApp()
+    # app.run()

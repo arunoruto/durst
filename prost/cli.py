@@ -2,15 +2,21 @@ import logging
 
 import click
 
+from prost.tui import ProstApp
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)-8s - %(levelname)s - %(message)s",
 )
 
 
-@click.group()
-def cli() -> None:
-    pass
+@click.group(invoke_without_command=True)
+@click.option("--db", default="sqlite.db", help="Location of the database")
+@click.pass_context
+def cli(ctx, db) -> None:
+    if ctx.invoked_subcommand is None:
+        app = ProstApp(db_file=db)
+        app.run()
 
 
 @cli.command()

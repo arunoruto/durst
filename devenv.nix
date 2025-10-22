@@ -31,7 +31,6 @@
       echo hello from $GREET
     '';
     prost.exec = ''uv run prost "$@"'';
-    prost-cli.exec = ''uv run prost-cli "$@"'';
   };
 
   # https://devenv.sh/basics/
