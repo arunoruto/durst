@@ -15,6 +15,7 @@ dependencies = ["click>=8.3.0", "textual>=6.3.0"]
 test = ["pytest>=8.3.3", "pytest-cov>=5.0.0"]
 
 [project.scripts]
+prost = "prost.tui:tui"
 prost-cli = "prost.cli:cli"
 
 [tool.pyright]
