@@ -31,12 +31,12 @@ log_format = "%(asctime)s - %(name)-8s - %(levelname)s - %(message)s"
 log_date_format = "%Y-%m-%d %H:%M:%S"
 testpaths = ["tests"]
 
+[tool.uv.build-backend]
+module-root = ""
+
 [build-system]
-requires = [
-  "setuptools",
-  #"setuptools-scm"
-]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build >= 0.8.0, <0.10.0"]
+build-backend = "uv_build"
 
 [semantic_release]
 version_variable = ["prost/__init__.py:__version__"]
