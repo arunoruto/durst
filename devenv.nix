@@ -11,7 +11,10 @@
   env.GREET = "devenv";
 
   # https://devenv.sh/packages/
-  packages = [ pkgs.git ];
+  packages = with pkgs; [
+    git
+    lazysql
+  ];
 
   # https://devenv.sh/languages/
   # languages.rust.enable = true;
