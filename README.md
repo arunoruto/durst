@@ -1,4 +1,5 @@
 <!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
+
 <a id="readme-top"></a>
 
 <!-- PROJECT SHIELDS -->
@@ -9,21 +10,24 @@
 *** for contributors-url, forks-url, etc. This is an optional, concise syntax you may use.
 *** https://www.markdownguide.org/basic-syntax/#reference-style-links
 -->
+
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 [![MIT License][license-shield]][license-url]
+
 <!-- [![LinkedIn][linkedin-shield]][linkedin-url] -->
-
-
 
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
   <a href="https://github.com/arunoruto/prost">
-    <!-- <img src="images/logo.png" alt="Logo" width="80" height="80"> -->
-    <h3>🥤</h3>
+    <picture>
+      <source srcset=".github/img/prost-light.svg" media="(prefers-color-scheme: dark)">
+      <img src=".github/img/prost-dark.svg" width="160" height="160">
+    </picture>
+    <!-- <h3>🥤</h3> -->
   </a>
 
   <h3 align="center">prost</h3>
@@ -41,8 +45,6 @@
     <a href="https://github.com/arunoruto/prost/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
   </p>
 </div>
-
-
 
 <!-- TABLE OF CONTENTS -->
 <details>
@@ -70,9 +72,8 @@
   </ol>
 </details>
 
-
-
 <!-- ABOUT THE PROJECT -->
+
 ## About The Project
 
 <!-- [![Product Name Screen Shot][product-screenshot]](https://example.com) -->
@@ -80,28 +81,26 @@
 **prost** is a Python-based registry system designed to manage and track soft drink transactions in an organized manner. Whether you're managing a small office fridge or a larger beverage distribution system, prost helps you keep track of inventory, purchases, and consumption.
 
 Key Features:
-* 📊 Track soft drink inventory and transactions
-* 💰 Monitor purchases and consumption patterns
-* 📈 Generate reports and analytics
-* 🔐 Secure user management and authentication
-* 🎯 [Add more features here as they're developed]
+
+- 📊 Track soft drink inventory and transactions
+- 💰 Monitor purchases and consumption patterns
+- 📈 Generate reports and analytics
+- 🔐 Secure user management and authentication
+- 🎯 [Add more features here as they're developed]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 ### Built With
 
 <!-- This section should list any major frameworks/libraries used to bootstrap your project. Leave any add-ons/plugins for the acknowledgements section. Here are a few examples. -->
 
-* [![Python][Python.org]][Python-url]
-* [Add other frameworks/libraries here]
+- [![Python][Python.org]][Python-url]
+- [Add other frameworks/libraries here]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- GETTING STARTED -->
+
 ## Getting Started
 
 This section provides instructions on setting up prost locally. Follow these simple steps to get a local copy up and running.
@@ -109,11 +108,12 @@ This section provides instructions on setting up prost locally. Follow these sim
 ### Prerequisites
 
 Before you begin, ensure you have the following installed:
-* Python 3.8 or higher
+
+- Python 3.8 or higher
   ```sh
   python --version
   ```
-* pip (Python package installer)
+- pip (Python package installer)
   ```sh
   pip --version
   ```
@@ -134,9 +134,11 @@ Before you begin, ensure you have the following installed:
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 4. Install required packages
+
    ```sh
    pip install -r requirements.txt
    ```
+
    <!-- Note: If requirements.txt doesn't exist yet, create it with project dependencies -->
 
 5. Set up configuration
@@ -148,9 +150,8 @@ Before you begin, ensure you have the following installed:
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- USAGE EXAMPLES -->
+
 ## Usage
 
 Here are some examples of how to use prost:
@@ -189,26 +190,25 @@ _For more examples and detailed documentation, please refer to the [Documentatio
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- ROADMAP -->
+
 ## Roadmap
 
 - [x] Initial project setup
 - [x] Repository structure
 - [ ] Core transaction management
-    - [ ] Add transaction
-    - [ ] View transaction history
-    - [ ] Edit/Delete transactions
+  - [ ] Add transaction
+  - [ ] View transaction history
+  - [ ] Edit/Delete transactions
 - [ ] Inventory management
-    - [ ] Track stock levels
-    - [ ] Low stock alerts
+  - [ ] Track stock levels
+  - [ ] Low stock alerts
 - [ ] Reporting features
-    - [ ] Daily/Weekly/Monthly reports
-    - [ ] User consumption analytics
+  - [ ] Daily/Weekly/Monthly reports
+  - [ ] User consumption analytics
 - [ ] User interface
-    - [ ] CLI interface
-    - [ ] Web interface (optional)
+  - [ ] CLI interface
+  - [ ] Web interface (optional)
 - [ ] Database integration
 - [ ] API development
 - [ ] Documentation
@@ -218,9 +218,8 @@ See the [open issues](https://github.com/arunoruto/prost/issues) for a full list
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- CONTRIBUTING -->
+
 ## Contributing
 
 Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
@@ -242,18 +241,16 @@ Don't forget to give the project a star! Thanks again!
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- LICENSE -->
+
 ## License
 
 Distributed under the MIT License. See `LICENSE` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- CONTACT -->
+
 ## Contact
 
 Mirza Arnaut - [@your_twitter](https://twitter.com/your_twitter) - your.email@example.com
@@ -262,28 +259,26 @@ Project Link: [https://github.com/arunoruto/prost](https://github.com/arunoruto/
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- ACKNOWLEDGMENTS -->
+
 ## Acknowledgments
 
 Resources and libraries that have been helpful in building prost:
 
-* [Choose an Open Source License](https://choosealicense.com)
-* [GitHub Emoji Cheat Sheet](https://www.webpagefx.com/tools/emoji-cheat-sheet)
-* [Malven's Flexbox Cheatsheet](https://flexbox.malven.co/)
-* [Malven's Grid Cheatsheet](https://grid.malven.co/)
-* [Img Shields](https://shields.io)
-* [GitHub Pages](https://pages.github.com)
-* [Font Awesome](https://fontawesome.com)
-* [React Icons](https://react-icons.github.io/react-icons/search)
+- [Choose an Open Source License](https://choosealicense.com)
+- [GitHub Emoji Cheat Sheet](https://www.webpagefx.com/tools/emoji-cheat-sheet)
+- [Malven's Flexbox Cheatsheet](https://flexbox.malven.co/)
+- [Malven's Grid Cheatsheet](https://grid.malven.co/)
+- [Img Shields](https://shields.io)
+- [GitHub Pages](https://pages.github.com)
+- [Font Awesome](https://fontawesome.com)
+- [React Icons](https://react-icons.github.io/react-icons/search)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
+
 [contributors-shield]: https://img.shields.io/github/contributors/arunoruto/prost.svg?style=for-the-badge
 [contributors-url]: https://github.com/arunoruto/prost/graphs/contributors
 [forks-shield]: https://img.shields.io/github/forks/arunoruto/prost.svg?style=for-the-badge
