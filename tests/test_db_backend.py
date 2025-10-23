@@ -10,12 +10,8 @@ def temp_db():
     # Create a temporary file
     fd, db_path = tempfile.mkstemp(suffix='.db')
     os.close(fd)
-    
-    # Initialize the database
-    db = ProstDB(db_path)
-    
-    yield db
-    
+
+    yield ProstDB(db_path)
     # Cleanup: remove the temporary database file
     if os.path.exists(db_path):
         os.remove(db_path)
