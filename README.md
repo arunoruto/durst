@@ -196,6 +196,9 @@ _For more examples and detailed documentation, please refer to the [Documentatio
 
 - [x] Initial project setup
 - [x] Repository structure
+- [x] Database integration
+  - [ ] Update user information
+  - [ ] Abstract class for different backends
 - [ ] Core transaction management
   - [ ] Add transaction
   - [ ] View transaction history
@@ -209,7 +212,6 @@ _For more examples and detailed documentation, please refer to the [Documentatio
 - [ ] User interface
   - [ ] CLI interface
   - [ ] Web interface (optional)
-- [ ] Database integration
 - [ ] API development
 - [ ] Documentation
 - [ ] Unit tests
