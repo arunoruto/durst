@@ -799,7 +799,7 @@ class ProstDB:
             SELECT 
                 dt.name as drink_name,
                 dt.brand,
-                SUM(sb.remaining_qty) as total_remaining
+                COALESCE(SUM(sb.remaining_qty), 0) as total_remaining
             FROM drink_types dt
             LEFT JOIN stock_batches sb ON dt.drink_type_id = sb.drink_type_id
             GROUP BY dt.drink_type_id, dt.name, dt.brand
