@@ -1,7 +1,7 @@
 from textual.app import App, ComposeResult
 from textual.widgets import DataTable, Footer, Header
 
-from prost.db import get_recent_purchases, setup_database
+from prost.db import ProstDB
 
 
 class ProstApp(App):
@@ -22,7 +22,7 @@ class ProstApp(App):
     def on_mount(self) -> None:
         """Called when the app is mounted to the screen."""
         # Ensure the database file and table are created.
-        setup_database(db_file=self.db_file)
+        self.db = ProstDB(db_file=self.db_file)
 
         # Just call the function directly. It's fast enough.
         self.populate_table()
@@ -37,7 +37,7 @@ class ProstApp(App):
         table.clear()
 
         # Fetch the latest records from the database.
-        recent_purchases = get_recent_purchases(limit=50, db_file=self.db_file)
+        recent_purchases = self.db.get_recent_purchases(limit=50)
 
         # If there's data, prepare and add it to the table.
         if recent_purchases:
