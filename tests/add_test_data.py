@@ -1,6 +1,7 @@
 # add_test_data.py
 from prost.db import setup_database
-from prost.db import add_user, stock_new_drinks, add_drink_type, get_orderer_id_by_name, get_drink_type_id_by_name, add_purchase
+from prost.db import add_user, stock_new_drinks, add_drink_type, get_id_by_name, get_drink_type_id_by_name
+from prost.db import add_purchase, add_repayment, get_user_balance
 
 
 if __name__ == "__main__":
@@ -23,7 +24,7 @@ if __name__ == "__main__":
     # TEST 4: Stock new drinks
     print("Stocking up test drinks....")
     who_is_ordering = "Alice"
-    id_of_alice = get_orderer_id_by_name(who_is_ordering)
+    id_of_alice = get_id_by_name(who_is_ordering)
     if id_of_alice is None:
         raise ValueError(f"User '{who_is_ordering}' not found in database.")
     alice_order = [
@@ -43,4 +44,21 @@ if __name__ == "__main__":
     print("Adding test purchases....")
     add_purchase("Bob", "Cola")
 
+    # TEST 6: Make repayments
+    id_bob = get_id_by_name("Bob")
+    id_charlie = get_id_by_name("Charlie")
+    id_alice = get_id_by_name("Alice")
+    if id_bob is None or id_charlie is None or id_alice is None:
+        raise ValueError("One of the test users was not found in the database.")
+    print("Adding test repayments....")
+    add_repayment(id_alice, id_bob, 5.00)
+    add_repayment(id_bob, id_charlie, 10.00)
 
+    # TEST 7: Check balances
+    print("Final balances after test data insertion:")
+    for user_name in ["Alice", "Bob", "Charlie"]:
+        usr_id = get_id_by_name(user_name)
+        if usr_id is None:
+            raise ValueError(f"User '{user_name}' not found in database.")
+        balance = get_user_balance(usr_id)
+        print(f"  {user_name}: {balance:.2f}")

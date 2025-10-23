@@ -122,7 +122,7 @@ def setup_database(db_file: str = DB_FILE):
 ##########################################
 #   Helper Functions for DB Operations   #
 ##########################################
-def get_orderer_id_by_name(name: str, db_file: str = DB_FILE) -> Union[int, None]:
+def get_id_by_name(name: str, db_file: str = DB_FILE) -> Union[int, None]:
     """ Retrieve the user_id for a user with the given name from the SQLite database.
 
     Args:
@@ -346,13 +346,13 @@ def add_purchase(user: str, drink: str, db_file: str = DB_FILE):
     Raises:
         ValueError: If the purchaser name or drink type name cannot be resolved to an ID, or if no stock is available for the requested drink.
         sqlite3.Error: If inserting the purchase or updating the database fails.
-        
+
     Notes:
         - The function expects helper functions get_orderer_id_by_name and get_drink_type_id_by_name to be available and return integer IDs or None.
         - The batch selection uses ORDER BY date_added ASC and LIMIT 1 to pick the oldest available batch with remaining_qty > 0.
         - Concurrency: SQLite uses coarse-grained locking; concurrent calls may need retry logic or a different DB for high concurrency scenarios.
     """
-    purchaser_id = get_orderer_id_by_name(user, db_file)
+    purchaser_id = get_id_by_name(user, db_file)
     if purchaser_id is None:
         raise ValueError(f"User not found: {user}")
 
@@ -417,3 +417,76 @@ def add_purchase(user: str, drink: str, db_file: str = DB_FILE):
 
     except sqlite3.Error as e:
         raise e
+
+def add_repayment(payer_id: int, receiver_id: int, amount: float, db_file: str = DB_FILE) -> int:
+    """Record a repayment and update user balances.
+
+    Inserts a row into repayments and adjusts the payer's and receiver's balances within a single transaction. Returns the new repayment_id.
+
+    Raises:
+        ValueError: if payer/receiver not found or amount is non-positive.
+        sqlite3.Error: on DB errors.
+    """
+    if amount <= 0:
+        raise ValueError("Amount must be positive")
+
+    if payer_id == receiver_id:
+        raise ValueError("Payer and receiver must be different users")
+
+    with sqlite3.connect(db_file) as conn:
+        cur = conn.cursor()
+
+        # Verify payer exists
+        cur.execute("SELECT 1 FROM users WHERE user_id = ?", (payer_id,))
+        if not cur.fetchone():
+            raise ValueError(f"Payer not found: {payer_id}")
+
+        # Verify receiver exists
+        cur.execute("SELECT 1 FROM users WHERE user_id = ?", (receiver_id,))
+        if not cur.fetchone():
+            raise ValueError(f"Receiver not found: {receiver_id}")
+
+        # Insert repayment record
+        cur.execute(
+            "INSERT INTO repayments (payer_id, receiver_id, amount) VALUES (?, ?, ?)",
+            (payer_id, receiver_id, amount),
+        )
+        repayment_id = cur.lastrowid
+        if repayment_id is None:
+            raise sqlite3.Error("Failed to record repayment")
+
+        # Update balances
+        cur.execute(
+            "UPDATE users SET balance = balance - ? WHERE user_id = ?",
+            (amount, payer_id),
+        )
+        cur.execute(
+            "UPDATE users SET balance = balance + ? WHERE user_id = ?",
+            (amount, receiver_id),
+        )
+
+    return repayment_id
+
+def get_user_balance(user_id: int, db_file: str = DB_FILE) -> float:
+    """Retrieve the current balance for a user by user_id.
+
+    Args:
+        user_id (int): The ID of the user whose balance to retrieve.
+        db_file (str): Path to the SQLite database file. Defaults to DB_FILE.
+
+    Returns:
+        float: The user's current balance.
+
+    Raises:
+        ValueError: If the user_id does not exist in the database.
+        sqlite3.Error: If a database error occurs.
+    """
+    con = sqlite3.connect(db_file)
+    cur = con.cursor()
+    cur.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
+    res = cur.fetchone()
+    con.close()
+    if res is None:
+        raise ValueError(f"User ID {user_id} not found.")
+    return res[0]
+
