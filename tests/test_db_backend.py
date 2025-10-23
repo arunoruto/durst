@@ -403,8 +403,9 @@ class TestDebtReporting:
         assert alice_id is not None, "Failed to create test user Alice."
         bob_id = db.add_user("Bob", "bob@example.com", verbose=False)
         assert bob_id is not None, "Failed to create test user Bob."
-        # charlie_id = db.add_user("Charlie", "charlie@example.com", verbose=False)
-        
+        charlie_id = db.add_user("Charlie", "charlie@example.com", verbose=False)
+        assert charlie_id is not None, "Failed to create test user Charlie."
+
         # 2. Add drink types
         cola_id = db.add_drink_type("Cola", "CocaCola", verbose=False)
         sprite_id = db.add_drink_type("Sprite", "CocaCola", verbose=False)
