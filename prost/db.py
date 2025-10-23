@@ -1,16 +1,15 @@
-# database_service.py
 import sqlite3
 from sqlite3 import Error
-from datetime import datetime
 from dataclasses import dataclass
-from typing import Optional, Union, List
+from typing import Optional, List
+
 
 DB_FILE = "sqlite.db"
+
 
 #################################
 #       Domain Classes          #
 #################################
-
 @dataclass
 class User:
     """Represents a user in the system."""
@@ -143,10 +142,10 @@ class Repayment:
             payment_date=row[4] if len(row) > 4 else None
         )
 
+
 #################################
 #     Database Manager Class    #
 #################################
-
 class ProstDB:
     """
     Main database manager class for the Prost application.
@@ -276,7 +275,6 @@ class ProstDB:
     ##########################################
     #          User Operations               #
     ##########################################
-    
     def get_user_by_id(self, user_id: int) -> Optional[User]:
         """Retrieve a User object by user_id.
         
