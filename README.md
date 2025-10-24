@@ -22,27 +22,27 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/arunoruto/prost">
+  <a href="https://github.com/arunoruto/durst">
     <picture>
-      <source srcset=".github/img/prost-light.svg" media="(prefers-color-scheme: dark)">
-      <img src=".github/img/prost-dark.svg" width="160" height="160">
+      <source srcset=".github/img/durst-light.svg" media="(prefers-color-scheme: dark)">
+      <img src=".github/img/durst-dark.svg" width="160" height="160">
     </picture>
     <!-- <h3>🥤</h3> -->
   </a>
 
-  <h3 align="center">prost</h3>
+  <h3 align="center">durst</h3>
 
   <p align="center">
     Python Registry for Organized Softdrink Transactions
     <br />
-    <a href="https://github.com/arunoruto/prost"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/arunoruto/durst"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/arunoruto/prost">View Demo</a>
+    <a href="https://github.com/arunoruto/durst">View Demo</a>
     ·
-    <a href="https://github.com/arunoruto/prost/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
+    <a href="https://github.com/arunoruto/durst/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     ·
-    <a href="https://github.com/arunoruto/prost/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
+    <a href="https://github.com/arunoruto/durst/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
   </p>
 </div>
 
@@ -78,7 +78,7 @@
 
 <!-- [![Product Name Screen Shot][product-screenshot]](https://example.com) -->
 
-**prost** is a Python-based registry system designed to manage and track soft drink transactions in an organized manner. Whether you're managing a small office fridge or a larger beverage distribution system, prost helps you keep track of inventory, purchases, and consumption.
+**durst** is a Python-based registry system designed to manage and track soft drink transactions in an organized manner. Whether you're managing a small office fridge or a larger beverage distribution system, durst helps you keep track of inventory, purchases, and consumption.
 
 Key Features:
 
@@ -103,7 +103,7 @@ Key Features:
 
 ## Getting Started
 
-This section provides instructions on setting up prost locally. Follow these simple steps to get a local copy up and running.
+This section provides instructions on setting up durst locally. Follow these simple steps to get a local copy up and running.
 
 ### Prerequisites
 
@@ -122,11 +122,11 @@ Before you begin, ensure you have the following installed:
 
 1. Clone the repo
    ```sh
-   git clone https://github.com/arunoruto/prost.git
+   git clone https://github.com/arunoruto/durst.git
    ```
 2. Navigate to the project directory
    ```sh
-   cd prost
+   cd durst
    ```
 3. Create a virtual environment (optional but recommended)
    ```sh
@@ -154,13 +154,13 @@ Before you begin, ensure you have the following installed:
 
 ## Usage
 
-Here are some examples of how to use prost:
+Here are some examples of how to use durst:
 
 ### Basic Usage
 
 ```python
 # Example: Add a soft drink transaction
-from prost import Transaction
+from durst import Transaction
 
 # Create a new transaction
 transaction = Transaction(
@@ -176,7 +176,7 @@ transaction.save()
 
 ```python
 # Example: Generate a report
-from prost import Report
+from durst import Report
 
 # Generate monthly consumption report
 report = Report.generate_monthly_report(month=10, year=2025)
@@ -186,7 +186,7 @@ print(report.summary())
 <!-- TODO: Add more usage examples as the project develops -->
 <!-- TODO: Add screenshots of the application in action -->
 
-_For more examples and detailed documentation, please refer to the [Documentation](https://github.com/arunoruto/prost/wiki)_
+_For more examples and detailed documentation, please refer to the [Documentation](https://github.com/arunoruto/durst/wiki)_
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -216,7 +216,7 @@ _For more examples and detailed documentation, please refer to the [Documentatio
 - [ ] Documentation
 - [ ] Unit tests
 
-See the [open issues](https://github.com/arunoruto/prost/issues) for a full list of proposed features (and known issues).
+See the [open issues](https://github.com/arunoruto/durst/issues) for a full list of proposed features (and known issues).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -237,8 +237,8 @@ Don't forget to give the project a star! Thanks again!
 
 ### Top contributors:
 
-<a href="https://github.com/arunoruto/prost/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=arunoruto/prost" alt="contrib.rocks image" />
+<a href="https://github.com/arunoruto/durst/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=arunoruto/durst" alt="contrib.rocks image" />
 </a>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -257,7 +257,7 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 Mirza Arnaut - [@your_twitter](https://twitter.com/your_twitter) - your.email@example.com
 
-Project Link: [https://github.com/arunoruto/prost](https://github.com/arunoruto/prost)
+Project Link: [https://github.com/arunoruto/durst](https://github.com/arunoruto/durst)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -265,7 +265,7 @@ Project Link: [https://github.com/arunoruto/prost](https://github.com/arunoruto/
 
 ## Acknowledgments
 
-Resources and libraries that have been helpful in building prost:
+Resources and libraries that have been helpful in building durst:
 
 - [Choose an Open Source License](https://choosealicense.com)
 - [GitHub Emoji Cheat Sheet](https://www.webpagefx.com/tools/emoji-cheat-sheet)
@@ -281,16 +281,16 @@ Resources and libraries that have been helpful in building prost:
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 
-[contributors-shield]: https://img.shields.io/github/contributors/arunoruto/prost.svg?style=for-the-badge
-[contributors-url]: https://github.com/arunoruto/prost/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/arunoruto/prost.svg?style=for-the-badge
-[forks-url]: https://github.com/arunoruto/prost/network/members
-[stars-shield]: https://img.shields.io/github/stars/arunoruto/prost.svg?style=for-the-badge
-[stars-url]: https://github.com/arunoruto/prost/stargazers
-[issues-shield]: https://img.shields.io/github/issues/arunoruto/prost.svg?style=for-the-badge
-[issues-url]: https://github.com/arunoruto/prost/issues
-[license-shield]: https://img.shields.io/github/license/arunoruto/prost.svg?style=for-the-badge
-[license-url]: https://github.com/arunoruto/prost/blob/master/LICENSE
+[contributors-shield]: https://img.shields.io/github/contributors/arunoruto/durst.svg?style=for-the-badge
+[contributors-url]: https://github.com/arunoruto/durst/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/arunoruto/durst.svg?style=for-the-badge
+[forks-url]: https://github.com/arunoruto/durst/network/members
+[stars-shield]: https://img.shields.io/github/stars/arunoruto/durst.svg?style=for-the-badge
+[stars-url]: https://github.com/arunoruto/durst/stargazers
+[issues-shield]: https://img.shields.io/github/issues/arunoruto/durst.svg?style=for-the-badge
+[issues-url]: https://github.com/arunoruto/durst/issues
+[license-shield]: https://img.shields.io/github/license/arunoruto/durst.svg?style=for-the-badge
+[license-url]: https://github.com/arunoruto/durst/blob/master/LICENSE
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/your-linkedin-username
 [product-screenshot]: images/screenshot.png
