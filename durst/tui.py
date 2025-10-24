@@ -1,6 +1,7 @@
-from durst.db import ProstDB
 from textual.app import App, ComposeResult
 from textual.widgets import DataTable, Footer, Header
+
+from durst.db import ProstDB
 
 
 class DurstApp(App):

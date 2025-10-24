@@ -1,6 +1,7 @@
 import logging
 
 import click
+
 from durst.tui import DurstApp
 
 logging.basicConfig(
