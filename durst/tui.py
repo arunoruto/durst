@@ -1,13 +1,12 @@
+from durst.db import ProstDB
 from textual.app import App, ComposeResult
 from textual.widgets import DataTable, Footer, Header
 
-from prost.db import ProstDB
 
-
-class ProstApp(App):
+class DurstApp(App):
     """A TUI for managing soft drinks."""
 
-    # CSS_PATH = "prost.css"  # You can add styling later
+    # CSS_PATH = "durst.css"  # You can add styling later
 
     def __init__(self, db_file: str = "sqlite.db"):
         self.db_file = db_file

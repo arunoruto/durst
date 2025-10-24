@@ -1,8 +1,7 @@
 import logging
 
 import click
-
-from prost.tui import ProstApp
+from durst.tui import DurstApp
 
 logging.basicConfig(
     level=logging.INFO,
@@ -15,7 +14,7 @@ logging.basicConfig(
 @click.pass_context
 def cli(ctx, db) -> None:
     if ctx.invoked_subcommand is None:
-        app = ProstApp(db_file=db)
+        app = DurstApp(db_file=db)
         app.run()
 
 
