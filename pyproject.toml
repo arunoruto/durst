@@ -18,9 +18,13 @@ test = ["pytest>=8.3.3", "pytest-cov>=5.0.0"]
 durst = "durst.cli:cli"
 
 [tool.pyright]
-exclude = [".venv", ".devenv/state/venv"]
-venvPath = ".devenv/state/venv"
+exclude = [".venv"]
+# venvPath = ".devenv/state/venv"
+venvPath = ".venv"
 venv = "."
+
+[tool.ty.environment]
+python = "./.venv"
 
 [tool.pytest.ini_options]
 minversion = "8.0"
