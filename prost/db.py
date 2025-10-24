@@ -17,15 +17,15 @@ class User:
     name: str = ""
     email: str = ""
     balance: float = 0.0
-    
+
     def is_in_debt(self) -> bool:
         """Check if user owes money."""
         return self.balance < 0
-    
+
     def is_owed(self) -> bool:
         """Check if user is owed money."""
         return self.balance > 0
-    
+
     @classmethod
     def from_db_row(cls, row: tuple) -> 'User':
         """Create a User instance from a database row."""
@@ -42,7 +42,7 @@ class DrinkType:
     drink_type_id: Optional[int] = None
     name: str = ""
     brand: str = ""
-    
+
     @classmethod
     def from_db_row(cls, row: tuple) -> 'DrinkType':
         """Create a DrinkType instance from a database row."""
@@ -59,7 +59,7 @@ class Order:
     orderer_id: int = 0
     order_date: Optional[str] = None
     total_cost: float = 0.0
-    
+
     @classmethod
     def from_db_row(cls, row: tuple) -> 'Order':
         """Create an Order instance from a database row."""
@@ -81,11 +81,11 @@ class StockBatch:
     initial_qty: int = 0
     remaining_qty: int = 0
     date_added: Optional[str] = None
-    
+
     def is_depleted(self) -> bool:
         """Check if the batch has no remaining stock."""
         return self.remaining_qty <= 0
-    
+
     @classmethod
     def from_db_row(cls, row: tuple) -> 'StockBatch':
         """Create a StockBatch instance from a database row."""
@@ -109,7 +109,7 @@ class Purchase:
     cost: float = 0.0
     charged_to_orderer_id: int = 0
     purchase_date: Optional[str] = None
-    
+
     @classmethod
     def from_db_row(cls, row: tuple) -> 'Purchase':
         """Create a Purchase instance from a database row."""
@@ -130,7 +130,7 @@ class Repayment:
     receiver_id: int = 0
     amount: float = 0.0
     payment_date: Optional[str] = None
-    
+
     @classmethod
     def from_db_row(cls, row: tuple) -> 'Repayment':
         """Create a Repayment instance from a database row."""
@@ -149,23 +149,23 @@ class Repayment:
 class ProstDB:
     """
     Main database manager class for the Prost application.
-    
+
     Handles all database operations including user management, drink inventory,orders, purchases, and repayments.
     """
     def __init__(self, db_file: str = DB_FILE):
         """
         Initialize the database manager.
-        
+
         Args:
             db_file (str): Path to the SQLite database file.
         """
         self.db_file = db_file
         self.setup_database()
-    
+
     def _get_connection(self) -> sqlite3.Connection:
         """Get a database connection."""
         return sqlite3.connect(self.db_file)
-    
+
     def setup_database(self):
         """
         Initialize and set up the SQLite database used by the application.
@@ -178,16 +178,16 @@ class ProstDB:
         - `drink_purchases`: individual purchase records (one row per purchased item).
         - `repayments`: records of repayments from one user to another.
         The function commits any changes and closes the connection before returning.
-        
+
         Raises:
             sqlite3.Error: If connecting to the database or executing any DDL statements
                 fails, the underlying sqlite3 exception is propagated.
-        
+
         Example:
             >>> db = ProstDB("/path/to/app.db")
             # After initialization, the specified SQLite file will exist and contain the required tables.
         """
-        
+
         con = self._get_connection()
         cur = con.cursor()
         # 1. users: Stores user information and their credit balance.
@@ -271,19 +271,19 @@ class ProstDB:
         """)
         con.commit()
         con.close()
-    
+
     ##########################################
     #          User Operations               #
     ##########################################
     def get_user_by_id(self, user_id: int) -> Optional[User]:
         """Retrieve a User object by user_id.
-        
+
         Args:
             user_id (int): The ID of the user to retrieve.
-        
+
         Returns:
             Optional[User]: The User object if found, otherwise None.
-        
+
         Raises:
             sqlite3.Error: If an error occurs while querying the database.
         """
@@ -295,19 +295,19 @@ class ProstDB:
         if res:
             return User.from_db_row(res)
         return None
-    
+
     def get_user_by_name(self, name: str) -> Optional[User]:
         """Retrieve a User object by name.
-        
+
         Args:
             name (str): The exact name of the user to look up. Case-sensitive.
-        
+
         Returns:
             Optional[User]: The User object if found, otherwise None.
-        
+
         Raises:
             sqlite3.Error: If an error occurs while querying the database.
-        
+
         Example:
             >>> db = ProstDB()
             >>> user = db.get_user_by_name("alice")
@@ -320,16 +320,16 @@ class ProstDB:
         if res:
             return User.from_db_row(res)
         return None
-    
+
     def get_user_id_by_name(self, name: str) -> Optional[int]:
         """Retrieve the user_id for a user with the given name.
-        
+
         Args:
             name (str): The exact name of the user to look up. Case-sensitive.
-        
+
         Returns:
             Optional[int]: The user_id if found, otherwise None.
-        
+
         Example:
             >>> db = ProstDB()
             >>> user_id = db.get_user_id_by_name("alice")
@@ -340,10 +340,10 @@ class ProstDB:
         res = cur.fetchone()
         con.close()
         return res[0] if res else None
-    
+
     def get_all_users(self) -> List[User]:
         """Retrieve all users from the database.
-        
+
         Returns:
             List[User]: A list of all User objects.
         """
@@ -353,18 +353,18 @@ class ProstDB:
         rows = cur.fetchall()
         con.close()
         return [User.from_db_row(row) for row in rows]
-    
+
     def add_user(self, name: str, email: str, verbose: bool = True) -> Optional[int]:
         """Add a new user to the database.
-        
+
         Args:
             name (str): The user's name.
             email (str): The user's email address (must be unique).
             verbose (bool): If True, prints a confirmation message. Defaults to True.
-        
+
         Returns:
             Optional[int]: The new user_id if created, or existing user_id if email already exists.
-        
+
         Raises:
             sqlite3.Error: If a database error occurs.
         """
@@ -388,7 +388,7 @@ class ProstDB:
         if verbose:
             print(f"Database: Added user {name} with email {email}")
         return user_id
-    
+
     def get_user_balance(self, user_id: int) -> float:
         """Retrieve the current balance for a user by user_id.
 
@@ -410,16 +410,16 @@ class ProstDB:
         if res is None:
             raise ValueError(f"User ID {user_id} not found.")
         return res[0]
-    
+
     ##########################################
     #        Drink Type Operations           #
     ##########################################
     def get_drink_type_by_id(self, drink_type_id: int) -> Optional[DrinkType]:
         """Retrieve a DrinkType object by drink_type_id.
-        
+
         Args:
             drink_type_id (int): The ID of the drink type to retrieve.
-        
+
         Returns:
             Optional[DrinkType]: The DrinkType object if found, otherwise None.
         """
@@ -431,16 +431,16 @@ class ProstDB:
         if res:
             return DrinkType.from_db_row(res)
         return None
-    
+
     def get_drink_type_by_name(self, name: str) -> Optional[DrinkType]:
         """Retrieve a DrinkType object by name.
-        
+
         Args:
             name (str): The exact name of the drink type. Case-sensitive.
-        
+
         Returns:
             Optional[DrinkType]: The DrinkType object if found, otherwise None.
-        
+
         Example:
             >>> db = ProstDB()
             >>> drink = db.get_drink_type_by_name("Cola")
@@ -453,7 +453,7 @@ class ProstDB:
         if res:
             return DrinkType.from_db_row(res)
         return None
-    
+
     def get_drink_type_id_by_name(self, name: str) -> Optional[int]:
         """Retrieve the drink_type_id for a drink type with the given name.
 
@@ -473,10 +473,10 @@ class ProstDB:
         res = cur.fetchone()
         con.close()
         return res[0] if res else None
-    
+
     def get_all_drink_types(self) -> List[DrinkType]:
         """Retrieve all drink types from the database.
-        
+
         Returns:
             List[DrinkType]: A list of all DrinkType objects.
         """
@@ -486,7 +486,7 @@ class ProstDB:
         rows = cur.fetchall()
         con.close()
         return [DrinkType.from_db_row(row) for row in rows]
-    
+
     def add_drink_type(self, name: str, brand: str = "", verbose: bool = True) -> Optional[int]:
         """Add a new drink type to the database.
 
@@ -521,7 +521,7 @@ class ProstDB:
         if verbose:
             print(f"Database: Added drink type '{name}' with brand '{brand}'")
         return drink_type_id
-    
+
     ##########################################
     #        Stock & Order Operations        #
     ##########################################
@@ -544,11 +544,11 @@ class ProstDB:
                     "quantity": int
                 }
             verbose (bool): If True, prints a confirmation message. Defaults to True.
-                
+
         Returns:
             Optional[int]: The new order_id if successful, None if an error occurred.
         """
-        
+
         # Use 'with conn:' which automatically begins a transaction
         # and commits it. If an exception occurs, it rolls back.
         try:
@@ -558,10 +558,10 @@ class ProstDB:
                 # Step 1: Create the new record in the 'orders' table
                 sql_order = "INSERT INTO orders (orderer_id, total_cost) VALUES (?, ?)"
                 cursor.execute(sql_order, (orderer_id, total_cost))
-                
+
                 # Get the 'order_id' of the order we just created
                 new_order_id = cursor.lastrowid
-                
+
                 if not new_order_id:
                     raise Error("Failed to create order, lastrowid not found.")
 
@@ -594,7 +594,7 @@ class ProstDB:
             print(f"Error during stocking operation: {e}")
             # The 'with conn:' block handles the rollback automatically
             return None
-    
+
     ##########################################
     #        Purchase Operations             #
     ##########################################
@@ -689,7 +689,7 @@ class ProstDB:
 
         except sqlite3.Error as e:
             raise e
-    
+
     ##########################################
     #        Repayment Operations            #
     ##########################################
@@ -749,16 +749,16 @@ class ProstDB:
             )
 
         return repayment_id
-    
+
     ##########################################
     #        Query & Reporting Methods       #
     ##########################################
     def get_recent_purchases(self, limit: int = 50) -> List[dict]:
         """Get recent purchase records with user and drink details.
-        
+
         Args:
             limit (int): Maximum number of records to return. Defaults to 50.
-        
+
         Returns:
             List[dict]: A list of dictionaries containing purchase details.
         """
@@ -780,16 +780,16 @@ class ProstDB:
             ORDER BY dp.purchase_date DESC
             LIMIT ?
         """, (limit,))
-        
+
         columns = [desc[0] for desc in cur.description]
         rows = cur.fetchall()
         con.close()
-        
+
         return [dict(zip(columns, row)) for row in rows]
-    
+
     def get_stock_status(self) -> List[dict]:
         """Get current stock status for all drink types.
-        
+
         Returns:
             List[dict]: A list of dictionaries with drink name and remaining quantity.
         """
@@ -805,16 +805,16 @@ class ProstDB:
             GROUP BY dt.drink_type_id, dt.name, dt.brand
             ORDER BY dt.name
         """)
-        
+
         columns = [desc[0] for desc in cur.description]
         rows = cur.fetchall()
         con.close()
-        
+
         return [dict(zip(columns, row)) for row in rows]
-    
+
     def get_user_debts(self) -> List[dict]:
         """Get a summary of who owes money to whom.
-        
+
         Returns:
             List[dict]: A list of dictionaries with debtor, creditor, and amount owed.
         """
@@ -833,9 +833,9 @@ class ProstDB:
             HAVING amount_owed > 0
             ORDER BY amount_owed DESC
         """)
-        
+
         columns = [desc[0] for desc in cur.description]
         rows = cur.fetchall()
         con.close()
-        
+
         return [dict(zip(columns, row)) for row in rows]
