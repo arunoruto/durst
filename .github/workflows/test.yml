@@ -1,3 +1,4 @@
+# https://szeyusim.medium.com/optimizing-uv-in-github-actions-one-global-cache-to-rule-them-all-9c64b42aee7f
 name: Testing
 
 on:
@@ -18,17 +19,25 @@ jobs:
         with:
           enable-cache: true
 
-      - uses: actions/cache@v4
-        id: cache-env
+      - name: Restore uv caches
+        uses: actions/cache/restore@v4
+        id: cache-restore
         with:
-          path: .venv
-          key: ${{ runner.os }}-uv-${{ steps.setup-python.outputs.uv-version }}-env-${{ hashFiles('uv.lock') }}
+          path: |
+            ~/.cache/uv
+            ~/.local/share/uv
+            .venv
+          key: uv-${{ steps.setup-python.outputs.uv-version }}-env-${{ hashFiles('uv.lock') }}-runner-${{ runner.os }}
+          restore-keys: uv-
 
-      - name: Setup venv for testing & Install dependencies
-        if: steps.cache-env.outputs.cache-hit != 'true'
-        run: |
-          uv venv
-          uv sync --group test
+      - name: Install dependencies for testing
+        run: uv sync --group test
+
+      # - name: Setup venv for testing & Install dependencies
+      #   if: steps.cache-env.outputs.cache-hit != 'true'
+      #   run: |
+      #     uv venv
+      #     uv sync --group test
 
       - name: Test and coverage report with pytest
         run: uv run pytest --cov --cov-report xml --junitxml=junit.xml -o junit_family=legacy
@@ -42,3 +51,13 @@ jobs:
             junit.xml
             htmlcov/
           retention-days: 7
+
+      - name: Restore uv caches
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/uv
+            ~/.local/share/uv
+            .venv
+          key: uv-${{ steps.setup-python.outputs.uv-version }}-env-${{ hashFiles('uv.lock') }}-runner-${{ runner.os }}
