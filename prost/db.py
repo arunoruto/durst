@@ -1,8 +1,7 @@
 import sqlite3
-from sqlite3 import Error
 from dataclasses import dataclass
-from typing import Optional, List
-
+from sqlite3 import Error
+from typing import List, Optional
 
 DB_FILE = "sqlite.db"
 
@@ -13,6 +12,7 @@ DB_FILE = "sqlite.db"
 @dataclass
 class User:
     """Represents a user in the system."""
+
     user_id: Optional[int] = None
     name: str = ""
     email: str = ""
@@ -27,52 +27,48 @@ class User:
         return self.balance > 0
 
     @classmethod
-    def from_db_row(cls, row: tuple) -> 'User':
+    def from_db_row(cls, row: tuple) -> "User":
         """Create a User instance from a database row."""
-        return cls(
-            user_id=row[0],
-            name=row[1],
-            email=row[2],
-            balance=row[3]
-        )
+        return cls(user_id=row[0], name=row[1], email=row[2], balance=row[3])
+
 
 @dataclass
 class DrinkType:
     """Represents a drink type."""
+
     drink_type_id: Optional[int] = None
     name: str = ""
     brand: str = ""
 
     @classmethod
-    def from_db_row(cls, row: tuple) -> 'DrinkType':
+    def from_db_row(cls, row: tuple) -> "DrinkType":
         """Create a DrinkType instance from a database row."""
         return cls(
-            drink_type_id=row[0],
-            name=row[1],
-            brand=row[2] if len(row) > 2 else ""
+            drink_type_id=row[0], name=row[1], brand=row[2] if len(row) > 2 else ""
         )
+
 
 @dataclass
 class Order:
     """Represents a bulk order."""
+
     order_id: Optional[int] = None
     orderer_id: int = 0
     order_date: Optional[str] = None
     total_cost: float = 0.0
 
     @classmethod
-    def from_db_row(cls, row: tuple) -> 'Order':
+    def from_db_row(cls, row: tuple) -> "Order":
         """Create an Order instance from a database row."""
         return cls(
-            order_id=row[0],
-            orderer_id=row[1],
-            order_date=row[2],
-            total_cost=row[3]
+            order_id=row[0], orderer_id=row[1], order_date=row[2], total_cost=row[3]
         )
+
 
 @dataclass
 class StockBatch:
     """Represents a batch of stock."""
+
     batch_id: Optional[int] = None
     drink_type_id: int = 0
     order_id: int = 0
@@ -87,7 +83,7 @@ class StockBatch:
         return self.remaining_qty <= 0
 
     @classmethod
-    def from_db_row(cls, row: tuple) -> 'StockBatch':
+    def from_db_row(cls, row: tuple) -> "StockBatch":
         """Create a StockBatch instance from a database row."""
         return cls(
             batch_id=row[0],
@@ -97,12 +93,14 @@ class StockBatch:
             cost_per_item=row[4],
             initial_qty=row[5],
             remaining_qty=row[6],
-            date_added=row[7] if len(row) > 7 else None
+            date_added=row[7] if len(row) > 7 else None,
         )
+
 
 @dataclass
 class Purchase:
     """Represents a drink purchase."""
+
     purchase_id: Optional[int] = None
     user_id: int = 0
     batch_id: int = 0
@@ -111,7 +109,7 @@ class Purchase:
     purchase_date: Optional[str] = None
 
     @classmethod
-    def from_db_row(cls, row: tuple) -> 'Purchase':
+    def from_db_row(cls, row: tuple) -> "Purchase":
         """Create a Purchase instance from a database row."""
         return cls(
             purchase_id=row[0],
@@ -119,12 +117,14 @@ class Purchase:
             batch_id=row[2],
             cost=row[3],
             charged_to_orderer_id=row[4],
-            purchase_date=row[5] if len(row) > 5 else None
+            purchase_date=row[5] if len(row) > 5 else None,
         )
+
 
 @dataclass
 class Repayment:
     """Represents a repayment between users."""
+
     repayment_id: Optional[int] = None
     payer_id: int = 0
     receiver_id: int = 0
@@ -132,14 +132,14 @@ class Repayment:
     payment_date: Optional[str] = None
 
     @classmethod
-    def from_db_row(cls, row: tuple) -> 'Repayment':
+    def from_db_row(cls, row: tuple) -> "Repayment":
         """Create a Repayment instance from a database row."""
         return cls(
             repayment_id=row[0],
             payer_id=row[1],
             receiver_id=row[2],
             amount=row[3],
-            payment_date=row[4] if len(row) > 4 else None
+            payment_date=row[4] if len(row) > 4 else None,
         )
 
 
@@ -152,6 +152,7 @@ class ProstDB:
 
     Handles all database operations including user management, drink inventory,orders, purchases, and repayments.
     """
+
     def __init__(self, db_file: str = DB_FILE):
         """
         Initialize the database manager.
@@ -289,7 +290,10 @@ class ProstDB:
         """
         con = self._get_connection()
         cur = con.cursor()
-        cur.execute("SELECT user_id, name, email, balance FROM users WHERE user_id = ?", (user_id,))
+        cur.execute(
+            "SELECT user_id, name, email, balance FROM users WHERE user_id = ?",
+            (user_id,),
+        )
         res = cur.fetchone()
         con.close()
         if res:
@@ -314,7 +318,9 @@ class ProstDB:
         """
         con = self._get_connection()
         cur = con.cursor()
-        cur.execute("SELECT user_id, name, email, balance FROM users WHERE name = ?", (name,))
+        cur.execute(
+            "SELECT user_id, name, email, balance FROM users WHERE name = ?", (name,)
+        )
         res = cur.fetchone()
         con.close()
         if res:
@@ -374,7 +380,9 @@ class ProstDB:
         existing = cur.fetchone()
         if existing:
             if verbose:
-                print(f"Database: User with email {email} already exists (id={existing[0]})")
+                print(
+                    f"Database: User with email {email} already exists (id={existing[0]})"
+                )
             con.close()
             return existing[0]
 
@@ -425,7 +433,10 @@ class ProstDB:
         """
         con = self._get_connection()
         cur = con.cursor()
-        cur.execute("SELECT drink_type_id, name, brand FROM drink_types WHERE drink_type_id = ?", (drink_type_id,))
+        cur.execute(
+            "SELECT drink_type_id, name, brand FROM drink_types WHERE drink_type_id = ?",
+            (drink_type_id,),
+        )
         res = cur.fetchone()
         con.close()
         if res:
@@ -447,7 +458,9 @@ class ProstDB:
         """
         con = self._get_connection()
         cur = con.cursor()
-        cur.execute("SELECT drink_type_id, name, brand FROM drink_types WHERE name = ?", (name,))
+        cur.execute(
+            "SELECT drink_type_id, name, brand FROM drink_types WHERE name = ?", (name,)
+        )
         res = cur.fetchone()
         con.close()
         if res:
@@ -487,7 +500,9 @@ class ProstDB:
         con.close()
         return [DrinkType.from_db_row(row) for row in rows]
 
-    def add_drink_type(self, name: str, brand: str = "", verbose: bool = True) -> Optional[int]:
+    def add_drink_type(
+        self, name: str, brand: str = "", verbose: bool = True
+    ) -> Optional[int]:
         """Add a new drink type to the database.
 
         Args:
@@ -507,7 +522,9 @@ class ProstDB:
         existing = cur.fetchone()
         if existing:
             if verbose:
-                print(f"Database: Drink type '{name}' already exists (id={existing[0]})")
+                print(
+                    f"Database: Drink type '{name}' already exists (id={existing[0]})"
+                )
             con.close()
             return existing[0]
 
@@ -525,7 +542,9 @@ class ProstDB:
     ##########################################
     #        Stock & Order Operations        #
     ##########################################
-    def stock_new_drinks(self, orderer_id: int, total_cost: float, items_list: list, verbose: bool = True) -> Optional[int]:
+    def stock_new_drinks(
+        self, orderer_id: int, total_cost: float, items_list: list, verbose: bool = True
+    ) -> Optional[int]:
         """
         Add a new stock order to the database.
 
@@ -569,12 +588,12 @@ class ProstDB:
                 batches_to_insert = []
                 for item in items_list:
                     batch_data = (
-                        item['drink_type_id'],
+                        item["drink_type_id"],
                         new_order_id,
                         orderer_id,
-                        item['cost_per_item'],
-                        item['quantity'],
-                        item['quantity']  # remaining_qty starts equal to initial_qty
+                        item["cost_per_item"],
+                        item["quantity"],
+                        item["quantity"],  # remaining_qty starts equal to initial_qty
                     )
                     batches_to_insert.append(batch_data)
 
@@ -587,7 +606,9 @@ class ProstDB:
                 cursor.executemany(sql_batch, batches_to_insert)
 
             if verbose:
-                print(f"Successfully stocked order ID: {new_order_id} with {len(batches_to_insert)} new batch(es).")
+                print(
+                    f"Successfully stocked order ID: {new_order_id} with {len(batches_to_insert)} new batch(es)."
+                )
             return new_order_id
 
         except Error as e:
@@ -764,7 +785,8 @@ class ProstDB:
         """
         con = self._get_connection()
         cur = con.cursor()
-        cur.execute("""
+        cur.execute(
+            """
             SELECT 
                 dp.purchase_id,
                 u.name as user_name,
@@ -779,7 +801,9 @@ class ProstDB:
             JOIN users orderer ON dp.charged_to_orderer_id = orderer.user_id
             ORDER BY dp.purchase_date DESC
             LIMIT ?
-        """, (limit,))
+        """,
+            (limit,),
+        )
 
         columns = [desc[0] for desc in cur.description]
         rows = cur.fetchall()
