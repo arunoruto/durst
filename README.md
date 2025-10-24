@@ -1,3 +1,5 @@
+[![DeepSource](https://app.deepsource.com/gh/arunoruto/durst.svg/?label=code+coverage&show_trend=true&token=3yACUgeu8xqzW87ce_3-P18h)](https://app.deepsource.com/gh/arunoruto/durst/)
+
 <!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
 
 <a id="readme-top"></a>
