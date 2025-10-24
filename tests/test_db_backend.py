@@ -2,7 +2,7 @@ import os
 import tempfile
 
 import pytest
-from durst.db import DrinkType, ProstDB, User
+from durst.db import DrinkType, DurstDB, User
 
 
 @pytest.fixture
@@ -12,14 +12,14 @@ def temp_db():
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
 
-    yield ProstDB(db_path)
+    yield DurstDB(db_file=db_path)
     # Cleanup: remove the temporary database file
     if os.path.exists(db_path):
         os.remove(db_path)
 
 
 @pytest.fixture
-def populated_db(temp_db: ProstDB):
+def populated_db(temp_db: DurstDB):
     """Create a database populated with test data."""
     db = temp_db
 
@@ -56,19 +56,19 @@ def populated_db(temp_db: ProstDB):
 class TestUserOperations:
     """Test user management operations."""
 
-    def test_add_user(self, temp_db: ProstDB):
+    def test_add_user(self, temp_db: DurstDB):
         """Test adding a new user."""
         user_id = temp_db.add_user("TestUser", "test@example.com", verbose=False)
         assert user_id is not None
         assert isinstance(user_id, int)
 
-    def test_add_duplicate_user_email(self, temp_db: ProstDB):
+    def test_add_duplicate_user_email(self, temp_db: DurstDB):
         """Test that adding a user with duplicate email returns existing ID."""
         user_id_1 = temp_db.add_user("User1", "duplicate@example.com", verbose=False)
         user_id_2 = temp_db.add_user("User2", "duplicate@example.com", verbose=False)
         assert user_id_1 == user_id_2
 
-    def test_get_user_by_name(self, temp_db: ProstDB):
+    def test_get_user_by_name(self, temp_db: DurstDB):
         """Test retrieving a user by name."""
         temp_db.add_user("Alice", "alice@example.com", verbose=False)
         user = temp_db.get_user_by_name("Alice")
@@ -77,7 +77,7 @@ class TestUserOperations:
         assert user.email == "alice@example.com"
         assert user.balance == 0.0
 
-    def test_get_user_by_id(self, temp_db: ProstDB):
+    def test_get_user_by_id(self, temp_db: DurstDB):
         """Test retrieving a user by ID."""
         user_id = temp_db.add_user("Bob", "bob@example.com", verbose=False)
         assert user_id is not None, "Failed to create test user Bob."
@@ -86,7 +86,7 @@ class TestUserOperations:
         assert user.user_id == user_id
         assert user.name == "Bob"
 
-    def test_get_all_users(self, temp_db: ProstDB):
+    def test_get_all_users(self, temp_db: DurstDB):
         """Test retrieving all users."""
         temp_db.add_user("Alice", "alice@example.com", verbose=False)
         temp_db.add_user("Bob", "bob@example.com", verbose=False)
@@ -97,7 +97,7 @@ class TestUserOperations:
         assert all(isinstance(user, User) for user in users)
         assert sorted([u.name for u in users]) == ["Alice", "Bob", "Charlie"]
 
-    def test_user_balance_methods(self, temp_db: ProstDB):
+    def test_user_balance_methods(self, temp_db: DurstDB):
         """Test User class helper methods."""
         user_id = temp_db.add_user("TestUser", "test@example.com", verbose=False)
         assert user_id is not None, "Failed to create test user TestUser."
@@ -112,19 +112,19 @@ class TestUserOperations:
 class TestDrinkTypeOperations:
     """Test drink type management operations."""
 
-    def test_add_drink_type(self, temp_db: ProstDB):
+    def test_add_drink_type(self, temp_db: DurstDB):
         """Test adding a new drink type."""
         drink_id = temp_db.add_drink_type("Cola", "CocaCola", verbose=False)
         assert drink_id is not None
         assert isinstance(drink_id, int)
 
-    def test_add_duplicate_drink_type(self, temp_db: ProstDB):
+    def test_add_duplicate_drink_type(self, temp_db: DurstDB):
         """Test that adding duplicate drink type returns existing ID."""
         drink_id_1 = temp_db.add_drink_type("Cola", "CocaCola", verbose=False)
         drink_id_2 = temp_db.add_drink_type("Cola", "Pepsi", verbose=False)
         assert drink_id_1 == drink_id_2
 
-    def test_get_drink_type_by_name(self, temp_db: ProstDB):
+    def test_get_drink_type_by_name(self, temp_db: DurstDB):
         """Test retrieving a drink type by name."""
         temp_db.add_drink_type("Sprite", "CocaCola", verbose=False)
         drink = temp_db.get_drink_type_by_name("Sprite")
@@ -132,7 +132,7 @@ class TestDrinkTypeOperations:
         assert drink.name == "Sprite"
         assert drink.brand == "CocaCola"
 
-    def test_get_drink_type_by_id(self, temp_db: ProstDB):
+    def test_get_drink_type_by_id(self, temp_db: DurstDB):
         """Test retrieving a drink type by ID."""
         drink_id = temp_db.add_drink_type("Fanta", "CocaCola", verbose=False)
         assert drink_id is not None, "Failed to create test drink type Fanta."
@@ -141,7 +141,7 @@ class TestDrinkTypeOperations:
         assert drink.drink_type_id == drink_id
         assert drink.name == "Fanta"
 
-    def test_get_all_drink_types(self, temp_db: ProstDB):
+    def test_get_all_drink_types(self, temp_db: DurstDB):
         """Test retrieving all drink types."""
         temp_db.add_drink_type("Cola", "CocaCola", verbose=False)
         temp_db.add_drink_type("Sprite", "CocaCola", verbose=False)
@@ -156,7 +156,7 @@ class TestDrinkTypeOperations:
 class TestStockOperations:
     """Test stock and order management operations."""
 
-    def test_stock_new_drinks(self, temp_db: ProstDB):
+    def test_stock_new_drinks(self, temp_db: DurstDB):
         """Test stocking new drinks."""
         user_id = temp_db.add_user("Alice", "alice@example.com", verbose=False)
         assert user_id is not None, "Failed to create test user Alice."
@@ -171,7 +171,7 @@ class TestStockOperations:
         assert order_id is not None
         assert isinstance(order_id, int)
 
-    def test_get_stock_status(self, populated_db: tuple[ProstDB, dict]):
+    def test_get_stock_status(self, populated_db: tuple[DurstDB, dict]):
         """Test retrieving stock status."""
         db, _ = populated_db
         stock = db.get_stock_status()
@@ -190,7 +190,7 @@ class TestStockOperations:
 class TestPurchaseOperations:
     """Test purchase operations."""
 
-    def test_add_purchase(self, populated_db: tuple[ProstDB, dict]):
+    def test_add_purchase(self, populated_db: tuple[DurstDB, dict]):
         """Test adding a purchase."""
         db, data = populated_db
 
@@ -199,7 +199,7 @@ class TestPurchaseOperations:
         assert purchase_id is not None
         assert isinstance(purchase_id, int)
 
-    def test_purchase_updates_balance(self, populated_db: tuple[ProstDB, dict]):
+    def test_purchase_updates_balance(self, populated_db: tuple[DurstDB, dict]):
         """Test that purchases update user balances correctly."""
         db, data = populated_db
 
@@ -228,7 +228,7 @@ class TestPurchaseOperations:
         assert bob.balance == initial_bob_balance - 1.50
         assert bob.is_in_debt()
 
-    def test_purchase_reduces_stock(self, populated_db: tuple[ProstDB, dict]):
+    def test_purchase_reduces_stock(self, populated_db: tuple[DurstDB, dict]):
         """Test that purchases reduce stock quantities."""
         db, _ = populated_db
 
@@ -250,7 +250,7 @@ class TestPurchaseOperations:
 
         assert updated_cola["total_remaining"] == initial_qty - 1
 
-    def test_multiple_purchases(self, populated_db: tuple[ProstDB, dict]):
+    def test_multiple_purchases(self, populated_db: tuple[DurstDB, dict]):
         """Test multiple purchases."""
         db, _ = populated_db
 
@@ -277,7 +277,7 @@ class TestPurchaseOperations:
         # Alice should be credited for all purchases = +$5.55
         assert abs(alice.balance - 5.55) < 0.01
 
-    def test_get_recent_purchases(self, populated_db: tuple[ProstDB, dict]):
+    def test_get_recent_purchases(self, populated_db: tuple[DurstDB, dict]):
         """Test retrieving recent purchases."""
         db, _ = populated_db
 
@@ -293,7 +293,7 @@ class TestPurchaseOperations:
         assert all("cost" in p for p in recent)
         assert all("orderer_name" in p for p in recent)
 
-    def test_purchase_no_stock(self, populated_db: tuple[ProstDB, dict]):
+    def test_purchase_no_stock(self, populated_db: tuple[DurstDB, dict]):
         """Test that purchasing when no stock is available raises an error."""
         db, data = populated_db
 
@@ -307,7 +307,7 @@ class TestPurchaseOperations:
 class TestRepaymentOperations:
     """Test repayment operations."""
 
-    def test_add_repayment(self, populated_db: tuple[ProstDB, dict]):
+    def test_add_repayment(self, populated_db: tuple[DurstDB, dict]):
         """Test adding a repayment."""
         db, data = populated_db
 
@@ -323,7 +323,7 @@ class TestRepaymentOperations:
         assert repayment_id is not None
         assert isinstance(repayment_id, int)
 
-    def test_repayment_updates_balances(self, populated_db: tuple[ProstDB, dict]):
+    def test_repayment_updates_balances(self, populated_db: tuple[DurstDB, dict]):
         """Test that repayments update user balances correctly."""
         db, data = populated_db
 
@@ -356,7 +356,7 @@ class TestRepaymentOperations:
         # Alice's balance should increase by $1.00
         assert abs(alice.balance - (alice_balance_before + 1.00)) < 0.01
 
-    def test_repayment_invalid_amount(self, populated_db: tuple[ProstDB, dict]):
+    def test_repayment_invalid_amount(self, populated_db: tuple[DurstDB, dict]):
         """Test that invalid repayment amounts raise errors."""
         db, data = populated_db
 
@@ -369,7 +369,7 @@ class TestRepaymentOperations:
         with pytest.raises(ValueError, match="Amount must be positive"):
             db.add_repayment(bob_id, alice_id, -10)
 
-    def test_repayment_same_user(self, populated_db: tuple[ProstDB, dict]):
+    def test_repayment_same_user(self, populated_db: tuple[DurstDB, dict]):
         """Test that repaying oneself raises an error."""
         db, data = populated_db
 
@@ -382,7 +382,7 @@ class TestRepaymentOperations:
 class TestDebtReporting:
     """Test debt reporting and query operations."""
 
-    def test_get_user_debts(self, populated_db: tuple[ProstDB, dict]):
+    def test_get_user_debts(self, populated_db: tuple[DurstDB, dict]):
         """Test retrieving user debt summary."""
         db, _ = populated_db
 
@@ -402,7 +402,7 @@ class TestDebtReporting:
         assert "Bob" in debtor_names
         assert "Charlie" in debtor_names
 
-    def test_full_workflow(self, temp_db: ProstDB):
+    def test_full_workflow(self, temp_db: DurstDB):
         """Test a complete workflow from setup to final balances."""
         db = temp_db
 

@@ -30,7 +30,7 @@
     hello.exec = ''
       echo hello from $GREET
     '';
-    durst.exec = ''uv run prost "$@"'';
+    durst.exec = ''uv run durst "$@"'';
   };
 
   # https://devenv.sh/basics/

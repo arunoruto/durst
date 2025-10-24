@@ -1,6 +1,7 @@
-from durst.db import ProstDB
 from textual.app import App, ComposeResult
 from textual.widgets import DataTable, Footer, Header
+
+from durst.db import DurstDB
 
 
 class DurstApp(App):
@@ -21,7 +22,7 @@ class DurstApp(App):
     def on_mount(self) -> None:
         """Called when the app is mounted to the screen."""
         # Ensure the database file and table are created.
-        self.db = ProstDB(db_file=self.db_file)
+        self.db = DurstDB(db_file=self.db_file)
 
         # Just call the function directly. It's fast enough.
         self.populate_table()
@@ -55,5 +56,5 @@ class DurstApp(App):
 
 if __name__ == "__main__":
     print("This is the CLI implementation. Please run the binary!")
-    # app = ProstApp()
+    # app = DurstApp()
     # app.run()

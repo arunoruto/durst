@@ -9,7 +9,7 @@ authors = [
   { name = "Tom Sander", email = "tom96.sander@t-online.de" },
 ]
 requires-python = ">=3.10"
-dependencies = ["click>=8.3.0", "pydantic>=2.12.3", "textual>=6.3.0"]
+dependencies = ["textual>=6.3.0", "click>=8.3.0", "pydantic>=2.12.3"]
 
 [dependency-groups]
 test = ["pytest>=8.3.3", "pytest-cov>=5.0.0"]
