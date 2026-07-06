@@ -351,11 +351,11 @@ class TestRepaymentOperations:
         alice = db.get_user_by_name("Alice")
         assert alice is not None, "Failed to retrieve Alice."
 
-        # Bob's balance should decrease by $1.00
-        assert abs(bob.balance - (bob_balance_before - 1.00)) < 0.01
+        # Bob settled $1.00 of his debt, so his balance should increase
+        assert abs(bob.balance - (bob_balance_before + 1.00)) < 0.01
 
-        # Alice's balance should increase by $1.00
-        assert abs(alice.balance - (alice_balance_before + 1.00)) < 0.01
+        # Alice received $1.00 in cash, so she is owed that much less
+        assert abs(alice.balance - (alice_balance_before - 1.00)) < 0.01
 
     def test_repayment_invalid_amount(self, populated_db: tuple[DurstDB, dict]):
         """Test that invalid repayment amounts raise errors."""
@@ -460,7 +460,7 @@ class TestDebtReporting:
         alice = db.get_user_by_name("Alice")
         assert alice is not None, "Failed to retrieve Alice."
 
-        # Bob now owes: -$2.75 - $2.00 = -$4.75
-        assert abs(bob.balance - (-4.75)) < 0.01
-        # Alice is now owed: $4.25 + $2.00 = $6.25
-        assert abs(alice.balance - 6.25) < 0.01
+        # Bob now owes: -$2.75 + $2.00 = -$0.75
+        assert abs(bob.balance - (-0.75)) < 0.01
+        # Alice is now owed: $4.25 - $2.00 = $2.25
+        assert abs(alice.balance - 2.25) < 0.01

@@ -2,7 +2,7 @@ import sqlite3
 from sqlite3 import Error
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 DB_FILE = "sqlite.db"
 
@@ -17,9 +17,6 @@ class User(BaseModel):
     name: str = ""
     email: str = ""
     balance: float = 0.0
-
-    def model_post_init(self, __context: Any) -> None:
-        pass
 
     def is_in_debt(self) -> bool:
         """Check if user owes money."""
@@ -316,6 +313,29 @@ class DurstDB(BaseModel):
         cur = con.cursor()
         cur.execute(
             "SELECT user_id, name, email, balance FROM users WHERE name = ?", (name,)
+        )
+        res = cur.fetchone()
+        con.close()
+        if res:
+            return User.from_db_row(res)
+        return None
+
+    def get_user_by_email(self, email: str) -> User | None:
+        """Retrieve a User object by email address.
+
+        Args:
+            email (str): The email address of the user to look up.
+
+        Returns:
+            User|None: The User object if found, otherwise None.
+
+        Raises:
+            sqlite3.Error: If an error occurs while querying the database.
+        """
+        con = self._get_connection()
+        cur = con.cursor()
+        cur.execute(
+            "SELECT user_id, name, email, balance FROM users WHERE email = ?", (email,)
         )
         res = cur.fetchone()
         con.close()
@@ -715,6 +735,10 @@ class DurstDB(BaseModel):
 
         Inserts a row into repayments and adjusts the payer's and receiver's balances within a single transaction. Returns the new repayment_id.
 
+        The payer hands cash to the receiver, settling debt: the payer's balance
+        increases (toward zero) and the receiver's balance decreases, since they
+        are owed that much less.
+
         Args:
             payer_id (int): The user_id of the person making the payment.
             receiver_id (int): The user_id of the person receiving the payment.
@@ -755,13 +779,13 @@ class DurstDB(BaseModel):
             if repayment_id is None:
                 raise sqlite3.Error("Failed to record repayment")
 
-            # Update balances
+            # Update balances: the payer settled debt, the receiver is owed less
             cur.execute(
-                "UPDATE users SET balance = balance - ? WHERE user_id = ?",
+                "UPDATE users SET balance = balance + ? WHERE user_id = ?",
                 (amount, payer_id),
             )
             cur.execute(
-                "UPDATE users SET balance = balance + ? WHERE user_id = ?",
+                "UPDATE users SET balance = balance - ? WHERE user_id = ?",
                 (amount, receiver_id),
             )
 
