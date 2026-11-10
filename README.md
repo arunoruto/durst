@@ -168,7 +168,11 @@ Then anyone can connect, no account needed:
 ssh drinks.example.org         # any username works
 ```
 
-A registered SSH key logs you in as yourself and lets you buy drinks. Any other key (or none) gets a read-only guest view.
+- **Approved key**: you're logged in and can buy drinks for yourself. Admins also buy for others and approve sign-ups.
+- **Unknown key**: read-only guest view; press `r` to register. Pick a new name or the name you already have in the sheet to take over that account. An admin approves you in the *Approvals* tab.
+- **No key**: read-only guest view.
+
+Keys: `j/k` up/down, `g/G` top/bottom, `h/l` or `←/→` switch tabs, `1-4` jump to a tab, `b` buy, `?` full help, `q` quit.
 
 ### Administration
 
@@ -177,14 +181,31 @@ Run the CLI inside the container (it uses `/data/durst.db` via `DURST_DB`):
 ```sh
 alias durst='docker compose exec durst durst'
 durst user add Alice alice@example.org
-durst user key Alice "$(cat alice_id_ed25519.pub)"   # repeat for each of her keys
+durst user promote Alice                             # admins are only made here
+durst user key Alice "$(cat alice_id_ed25519.pub)"   # or let Alice register herself
 durst drink add Mate --brand "Club-Mate"
-durst stock add Alice -i Mate:1.20:20                # Alice paid for 20 Mate at 1.20 €
-durst repay Bob Alice 5                              # Bob paid Alice 5 € in cash
-durst debts
+durst stock add Kasse -i Mate:0.95:20                # bought from the pot
+durst stock add Alice -i Mate:0.95:20                # Alice paid; she's credited per bottle
+durst deposit Bob 20                                 # Bob put 20 € into the pot
+durst repay Bob Alice 5                              # Bob paid Alice 5 € directly
 ```
 
 `durst --help` lists everything. Running `durst` without a subcommand opens the TUI locally with full admin rights.
+
+### Google Sheet sync
+
+durst syncs both ways with the legacy *Getränkekasse* sheet while people switch over:
+
+1. Create a Google Cloud service account, download its JSON key, and share the sheet with the account's email as an **editor**.
+2. Save the key as `data/google-service-account.json`, set `DURST_SHEET_ID` in `compose.yaml`, and restart. `durst serve` then syncs every 5 minutes (`--sync-interval`); `durst sync` runs a sync right away.
+
+The first sync imports everything. From then on, durst exchanges new drinks, orders and deposits with the sheet. The sheet's shared pot becomes the `Kasse` user. To keep track, durst writes:
+
+- a key into a new `durst` column (F in *Preise & Bestellungen*, J in *Getränkeentnahmen*) — don't edit it
+- money that only exists in durst (deposits, repayments, stock someone paid for) into column E *Einzahlungen durst* of *Kontenübersicht*, and changes *Guthaben* to `=B+E-C`
+- new users and drinks into the dropdowns
+
+A row is imported once it is unchanged for one sync interval, so half-typed rows wait. Once synced, fix mistakes in durst: edits to synced rows in the sheet are ignored, and deleted rows come back.
 
 <!-- ROADMAP -->
 

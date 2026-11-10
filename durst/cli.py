@@ -1,6 +1,8 @@
+import os
+
 import click
 
-from durst.db import DurstDB
+from durst.db import POT, DurstDB
 
 
 #################################
@@ -94,18 +96,18 @@ def user() -> None:
 
 @user.command("add")
 @click.argument("name")
-@click.argument("email")
+@click.argument("email", required=False)
 @click.pass_obj
-def user_add(db: DurstDB, name: str, email: str) -> None:
-    """Add a new user with NAME and EMAIL."""
-    existing = db.get_user_by_email(email)
+def user_add(db: DurstDB, name: str, email: str | None) -> None:
+    """Add a new user with NAME and optional EMAIL."""
+    existing = db.get_user_by_name(name) or (email and db.get_user_by_email(email))
     if existing:
         raise click.ClickException(
-            f"A user with email {email} already exists: "
-            f"{existing.name} (id={existing.user_id})"
+            f"User already exists: {existing.name} <{existing.email or '-'}> "
+            f"(id={existing.user_id})"
         )
     user_id = db.add_user(name, email, verbose=False)
-    click.echo(f"Added user {name} <{email}> (id={user_id})")
+    click.echo(f"Added user {name} <{email or '-'}> (id={user_id})")
 
 
 @user.command("key")
@@ -121,14 +123,38 @@ def user_key(db: DurstDB, name: str, key: str) -> None:
     click.echo(f"Added SSH key for {name}.")
 
 
+@user.command("promote")
+@click.argument("name")
+@click.pass_obj
+def user_promote(db: DurstDB, name: str) -> None:
+    """Make NAME an admin (approves sign-ups, buys for others)."""
+    try:
+        db.set_role(name, "admin")
+    except ValueError as e:
+        raise click.ClickException(str(e))
+    click.echo(f"{name} is now an admin.")
+
+
+@user.command("demote")
+@click.argument("name")
+@click.pass_obj
+def user_demote(db: DurstDB, name: str) -> None:
+    """Make admin NAME a normal user again."""
+    try:
+        db.set_role(name, "user")
+    except ValueError as e:
+        raise click.ClickException(str(e))
+    click.echo(f"{name} is a normal user again.")
+
+
 @user.command("list")
 @click.pass_obj
 def user_list(db: DurstDB) -> None:
     """List all users and their balances."""
     users = db.get_all_users()
     echo_table(
-        ["ID", "Name", "Email", "Balance"],
-        [(u.user_id, u.name, u.email, fmt_money(u.balance)) for u in users],
+        ["ID", "Name", "Email", "Role", "Balance"],
+        [(u.user_id, u.name, u.email or "", u.role, fmt_money(u.balance)) for u in users],
     )
 
 
@@ -300,6 +326,19 @@ def repay(db: DurstDB, payer: str, receiver: str, amount: float) -> None:
 
 
 @cli.command()
+@click.argument("name")
+@click.argument("amount", type=float)
+@click.pass_obj
+def deposit(db: DurstDB, name: str, amount: float) -> None:
+    """Record NAME putting AMOUNT of cash into the pot (Kasse)."""
+    try:
+        db.add_repayment(resolve_user_id(db, name), db.pot_id(), amount)
+    except ValueError as e:
+        raise click.ClickException(str(e))
+    click.echo(f"{name} put {fmt_money(amount)} into the {POT}.")
+
+
+@cli.command()
 @click.option(
     "--limit",
     default=20,
@@ -344,6 +383,42 @@ def debts(db: DurstDB) -> None:
 #################################
 #          SSH Server           #
 #################################
+sheet_options = [
+    click.option(
+        "--sheet-id",
+        envvar="DURST_SHEET_ID",
+        help="Google Sheet to sync with (the ID from its URL)",
+    ),
+    click.option(
+        "--google-credentials",
+        envvar="GOOGLE_APPLICATION_CREDENTIALS",
+        type=click.Path(dir_okay=False),
+        help="Service account key file (JSON) with edit access to the sheet",
+    ),
+]
+
+
+def with_sheet_options(f):
+    for option in reversed(sheet_options):
+        f = option(f)
+    return f
+
+
+@cli.command()
+@with_sheet_options
+@click.pass_obj
+def sync(db: DurstDB, sheet_id: str | None, google_credentials: str | None) -> None:
+    """Sync once with the Google Sheet (the first run imports everything)."""
+    from durst.sheet import SheetClient, locked_sync
+
+    if not sheet_id or not google_credentials or not os.path.exists(google_credentials):
+        raise click.ClickException(
+            "Set --sheet-id and --google-credentials to an existing key file (or their env vars)."
+        )
+    for line in locked_sync(db, SheetClient(sheet_id, google_credentials)) or ["nothing to do"]:
+        click.echo(line)
+
+
 @cli.command()
 @click.option("--host", default="0.0.0.0", show_default=True)
 @click.option("--port", default=2222, show_default=True, type=int)
@@ -353,14 +428,35 @@ def debts(db: DurstDB) -> None:
     show_default=True,
     help="Server host key; generated on first start",
 )
+@with_sheet_options
+@click.option(
+    "--sync-interval",
+    default=300,
+    show_default=True,
+    type=click.IntRange(min=30),
+    help="Seconds between sheet syncs",
+)
 @click.pass_obj
-def serve(db: DurstDB, host: str, port: int, host_key: str) -> None:
-    """Serve the TUI over SSH (registered keys can buy, others are guests)."""
+def serve(
+    db: DurstDB,
+    host: str,
+    port: int,
+    host_key: str,
+    sheet_id: str | None,
+    google_credentials: str | None,
+    sync_interval: int,
+) -> None:
+    """Serve the TUI over SSH, and sync with the sheet if one is configured."""
     import asyncio
 
     from durst.ssh import serve as ssh_serve
 
-    asyncio.run(ssh_serve(db.db_file, host, port, host_key))
+    sheet = None
+    if sheet_id and google_credentials and os.path.exists(google_credentials):
+        sheet = (sheet_id, google_credentials, sync_interval)
+    elif sheet_id:
+        click.echo(f"sheet sync disabled: no credentials file at {google_credentials!r}")
+    asyncio.run(ssh_serve(db.db_file, host, port, host_key, sheet))
 
 
 if __name__ == "__main__":

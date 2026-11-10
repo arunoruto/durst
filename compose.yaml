@@ -4,5 +4,12 @@ services:
     restart: unless-stopped
     ports:
       - "22:2222" # `ssh <host>` just works; use e.g. "2222:2222" if the host's sshd owns 22
+    environment:
+      TZ: Europe/Berlin
+      # Two-way sync with the legacy Google Sheet; drop the service account key
+      # into ./data and restart. Without the key file, sync stays off.
+      # DURST_SHEET_ID: 19nEaGZPfE3LkqPre24MjYqnt-ZqwSqrPoAS87Yccy8k
+      GOOGLE_APPLICATION_CREDENTIALS: /data/google-service-account.json
     volumes:
       - ./data:/data
+      - /etc/localtime:/etc/localtime:ro

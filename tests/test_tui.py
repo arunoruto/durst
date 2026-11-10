@@ -1,169 +1,128 @@
 import asyncio
-import os
-import tempfile
 
 import pytest
 
-from textual.widgets import DataTable, Input, Select
-
 from durst.db import DurstDB
-from durst.tui import AddUserScreen, BuyScreen, DurstApp
+from durst.tui import ConfirmScreen, DurstApp, PickScreen, RegisterScreen, VimTable
+
+KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBzR0cJjLhZ7bG2oJ0n8yDJ1V8wX6kYwqQ6c6w2Zr6kM new"
 
 
 @pytest.fixture
-def db_path():
-    """Create a temporary database file path for testing."""
-    fd, path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)
-    yield path
-    if os.path.exists(path):
-        os.remove(path)
-
-
-@pytest.fixture
-def populated_db_path(db_path: str):
-    """A database file with users, drinks, stock, and one purchase."""
-    db = DurstDB(db_file=db_path)
+def db_path(tmp_path):
+    """A database with Alice (admin), Bob, and 24 Colas."""
+    path = str(tmp_path / "t.db")
+    db = DurstDB(db_file=path)
     alice = db.add_user("Alice", "alice@example.com", verbose=False)
     db.add_user("Bob", "bob@example.com", verbose=False)
-    cola = db.add_drink_type("Cola", "CocaCola", verbose=False)
-    assert alice is not None and cola is not None
+    db.set_role("Alice", "admin")
+    cola = db.add_drink_type("Cola", verbose=False)
+    assert alice and cola
     db.stock_new_drinks(
-        alice,
-        36.0,
-        [{"drink_type_id": cola, "cost_per_item": 1.50, "quantity": 24}],
-        verbose=False,
+        alice, 36.0, [{"drink_type_id": cola, "cost_per_item": 1.5, "quantity": 24}], verbose=False
     )
-    db.add_purchase("Bob", "Cola")
-    return db_path
+    return path
 
 
-class TestEmptyDatabase:
-    def test_tables_render_with_headers(self, db_path: str):
-        """All tabs should show column headers even with no data."""
+def run(app: DurstApp, steps):
+    async def go():
+        async with app.run_test(size=(100, 30)) as pilot:
+            await pilot.pause()
+            await steps(app, pilot)
 
-        async def run() -> None:
-            app = DurstApp(db_file=db_path)
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                for table_id, n_columns in [
-                    ("#purchases-table", 6),
-                    ("#stock-table", 3),
-                    ("#balances-table", 3),
-                    ("#debts-table", 3),
-                ]:
-                    table = app.query_one(table_id, DataTable)
-                    assert len(table.columns) == n_columns
-                    assert table.row_count == 0
-
-        asyncio.run(run())
-
-    def test_buy_without_users_warns(self, db_path: str):
-        """Pressing 'b' with no users should not open the buy dialog."""
-
-        async def run() -> None:
-            app = DurstApp(db_file=db_path)
-            async with app.run_test() as pilot:
-                await pilot.press("b")
-                await pilot.pause()
-                assert not isinstance(app.screen, BuyScreen)
-
-        asyncio.run(run())
+    asyncio.run(go())
 
 
-class TestPopulatedDatabase:
-    def test_tables_show_data(self, populated_db_path: str):
-        async def run() -> None:
-            app = DurstApp(db_file=populated_db_path)
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                assert app.query_one("#purchases-table", DataTable).row_count == 1
-                assert app.query_one("#stock-table", DataTable).row_count == 1
-                assert app.query_one("#balances-table", DataTable).row_count == 2
-                assert app.query_one("#debts-table", DataTable).row_count == 1
+def test_tables_and_vim_navigation(db_path):
+    async def steps(app, pilot):
+        assert app.query_one("#drinks", VimTable).row_count == 1
+        await pilot.press("l")  # next tab: balances
+        table = app.query_one("#balances", VimTable)
+        assert app.screen.focused is table and table.row_count == 2
+        await pilot.press("j")
+        assert table.cursor_row == 1
+        await pilot.press("g")
+        assert table.cursor_row == 0
+        await pilot.press("right", "right")
+        assert app.tabs[app.tab][0] == "approvals"  # local runs are admin
+        await pilot.press("left")
+        assert app.tabs[app.tab][0] == "history"
+        await pilot.press("question_mark")
+        assert app.full_help
 
-        asyncio.run(run())
+    run(DurstApp(db_path), steps)
 
-    def test_buy_dialog_opens_and_cancels(self, populated_db_path: str):
-        async def run() -> None:
-            app = DurstApp(db_file=populated_db_path)
-            async with app.run_test() as pilot:
-                await pilot.press("b")
-                await pilot.pause()
-                assert isinstance(app.screen, BuyScreen)
-                await pilot.click("#buy-cancel")
-                await pilot.pause()
-                assert not isinstance(app.screen, BuyScreen)
 
-        asyncio.run(run())
+def test_member_buys_for_themselves(db_path):
+    async def steps(app, pilot):
+        await pilot.press("b")
+        assert isinstance(app.screen, PickScreen)  # straight to drinks, no user list
+        assert app.screen.title_text == "What are you drinking?"
+        await pilot.press("enter")
+        assert isinstance(app.screen, ConfirmScreen)
+        await pilot.press("y")
+        await pilot.pause()
 
-    def test_buy_flow_records_purchase(self, populated_db_path: str):
-        async def run() -> None:
-            app = DurstApp(db_file=populated_db_path)
-            async with app.run_test() as pilot:
-                await pilot.press("b")
-                await pilot.pause()
-                screen = app.screen
-                assert isinstance(screen, BuyScreen)
-                screen.query_one("#buy-user", Select).value = "Bob"
-                screen.query_one("#buy-drink", Select).value = "Cola"
-                await pilot.click("#buy-confirm")
-                await pilot.pause()
-                assert app.query_one("#purchases-table", DataTable).row_count == 2
+    run(DurstApp(db_path, user="Bob"), steps)
+    assert DurstDB(db_file=db_path).get_user_by_name("Bob").balance == -1.5
 
-            db = DurstDB(db_file=populated_db_path)
-            bob = db.get_user_by_name("Bob")
-            assert bob is not None
-            assert abs(bob.balance - (-3.00)) < 0.01
 
-        asyncio.run(run())
+def test_cancel_buy_records_nothing(db_path):
+    async def steps(app, pilot):
+        await pilot.press("b", "enter", "n")
+        await pilot.pause()
+        assert not isinstance(app.screen, (PickScreen, ConfirmScreen))
 
-    def test_add_user_flow(self, populated_db_path: str):
-        async def run() -> None:
-            app = DurstApp(db_file=populated_db_path)
-            async with app.run_test() as pilot:
-                await pilot.press("u")
-                await pilot.pause()
-                screen = app.screen
-                assert isinstance(screen, AddUserScreen)
-                screen.query_one("#user-name", Input).value = "Charlie"
-                screen.query_one("#user-email", Input).value = "charlie@example.com"
-                await pilot.click("#user-confirm")
-                await pilot.pause()
-                assert app.query_one("#balances-table", DataTable).row_count == 3
+    run(DurstApp(db_path, user="Bob"), steps)
+    assert DurstDB(db_file=db_path).get_recent_purchases() == []
 
-            db = DurstDB(db_file=populated_db_path)
-            assert db.get_user_by_name("Charlie") is not None
 
-        asyncio.run(run())
+def test_admin_buys_for_others(db_path):
+    async def steps(app, pilot):
+        await pilot.press("b")
+        assert app.screen.title_text == "Who is drinking?"
+        await pilot.press("j", "enter", "enter", "enter")  # Bob, Cola, Yes
+        await pilot.pause()
 
-    def test_add_duplicate_email_rejected(self, populated_db_path: str):
-        async def run() -> None:
-            app = DurstApp(db_file=populated_db_path)
-            async with app.run_test() as pilot:
-                await pilot.press("u")
-                await pilot.pause()
-                screen = app.screen
-                assert isinstance(screen, AddUserScreen)
-                screen.query_one("#user-name", Input).value = "Impostor"
-                screen.query_one("#user-email", Input).value = "alice@example.com"
-                await pilot.click("#user-confirm")
-                await pilot.pause()
-                # Still only Alice and Bob.
-                assert app.query_one("#balances-table", DataTable).row_count == 2
+    run(DurstApp(db_path, user="Alice"), steps)
+    assert DurstDB(db_file=db_path).get_user_by_name("Bob").balance == -1.5
 
-        asyncio.run(run())
 
-    def test_refresh_binding(self, populated_db_path: str):
-        async def run() -> None:
-            app = DurstApp(db_file=populated_db_path)
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                # Add data behind the app's back, then refresh.
-                db = DurstDB(db_file=populated_db_path)
-                db.add_purchase("Bob", "Cola")
-                await pilot.press("r")
-                await pilot.pause()
-                assert app.query_one("#purchases-table", DataTable).row_count == 2
+def test_guest_registers_and_admin_approves(db_path):
+    async def register(app, pilot):
+        assert not app.check_action("buy", ())
+        await pilot.press("r")
+        assert isinstance(app.screen, RegisterScreen)
+        await pilot.press(*"Carla", "enter", "enter")
+        await pilot.pause()
+        assert app.pending
+        assert not app.check_action("register", ())
 
-        asyncio.run(run())
+    run(DurstApp(db_path, guest=True, key=KEY), register)
+    db = DurstDB(db_file=db_path)
+    assert db.get_user_by_ssh_key(KEY) is None
+    assert [u.name for u in db.get_all_users()] == ["Alice", "Bob"]  # not approved yet
+
+    async def approve(app, pilot):
+        assert "Approvals (1)" in [label for _, label in app.tabs]
+        await pilot.press("4")
+        assert app.check_action("approve", ())
+        await pilot.press("a")
+        await pilot.pause()
+
+    run(DurstApp(db_path, user="Alice"), approve)
+    assert db.get_user_by_ssh_key(KEY).name == "Carla"
+
+
+def test_claiming_an_account_and_rejecting(db_path):
+    db = DurstDB(db_file=db_path)
+    assert db.register("Bob", None, KEY) is True  # claims the existing Bob
+    assert db.get_pending_keys()[0]["new_user"] is False
+
+    async def reject(app, pilot):
+        assert not app.check_action("approve", ())  # Bob is not an admin
+        assert len(app.tabs) == 3
+
+    run(DurstApp(db_path, user="Bob"), reject)
+    db.reject_key(db.get_pending_keys()[0]["key"])
+    assert db.get_pending_keys() == [] and db.get_user_by_name("Bob")  # Bob survives

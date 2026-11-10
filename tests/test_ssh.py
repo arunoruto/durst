@@ -30,8 +30,10 @@ def test_key_maps_to_user_else_guest(tmp_path):
     # A probe of Alice's key followed by keyless (guest) login must not stay Alice.
     assert server.get_kbdint_challenge("x", "", "") is True
     assert server.conn.extra["durst_user"] is None
-    assert not server.validate_public_key("x", other.convert_to_public())
+    # Unknown keys get in as guests, carrying the key so they can register it.
+    assert server.validate_public_key("x", other.convert_to_public())
     assert server.conn.extra["durst_user"] is None
+    assert server.conn.extra["durst_key"].startswith("ssh-ed25519 ")
 
 
 def test_guest_cannot_buy(tmp_path):
@@ -39,9 +41,7 @@ def test_guest_cannot_buy(tmp_path):
         app = DurstApp(str(tmp_path / "t.db"), guest=True)
         async with app.run_test():
             assert not app.check_action("buy", ())
-            assert not app.check_action("add_user", ())
-        member = DurstApp(str(tmp_path / "t.db"), user="Alice")
-        assert member.check_action("buy", ())
-        assert not member.check_action("add_user", ())
+            assert not app.check_action("register", ())  # no key, nothing to register
+            assert not app.check_action("approve", ())
 
     asyncio.run(run())

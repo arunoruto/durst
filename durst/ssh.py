@@ -1,7 +1,11 @@
 """Serve the durst TUI over SSH, ``ssh terminal.shop`` style.
 
-A registered public key logs you in as its owner; any other key (or none)
-lands you in a read-only guest session.
+An approved public key logs you in as its owner. Any other key gets a
+read-only guest session that can register the key (admins approve it);
+clients without a key get a plain guest session.
+
+ponytail: every key is accepted, so with several keys the client's first one
+wins; register that one too, or pick one with ``ssh -i``.
 """
 
 import asyncio
@@ -34,16 +38,17 @@ class DurstSSHServer(asyncssh.SSHServer):
     def validate_public_key(self, username: str, key: asyncssh.SSHKey) -> bool:
         # Also called for unsigned probes, but the last call before auth
         # succeeds is always the key that signed; kbdint (guest) resets it.
-        user = self.db.get_user_by_ssh_key(key.export_public_key().decode())
-        self.conn.set_extra_info(durst_user=user.name if user else None)
-        return user is not None
+        line = key.export_public_key().decode()
+        user = self.db.get_user_by_ssh_key(line)
+        self.conn.set_extra_info(durst_user=user.name if user else None, durst_key=line)
+        return True
 
     def kbdint_auth_supported(self) -> bool:
         return True
 
     def get_kbdint_challenge(self, username: str, lang: str, submethods: str):
         # No registered key: let them in without a prompt, as a guest.
-        self.conn.set_extra_info(durst_user=None)
+        self.conn.set_extra_info(durst_user=None, durst_key=None)
         return True
 
 
@@ -61,7 +66,9 @@ def session_handler(db_file: str):
             return
 
         user = process.get_extra_info("durst_user")
-        args = [sys.executable, "-m", "durst.tui", db_file] + ([user] if user else [])
+        key = process.get_extra_info("durst_key")
+        args = [sys.executable, "-m", "durst.tui", db_file]
+        args += ["--user", user] if user else ["--key", key] if key else []
         master, slave = pty.openpty()
         proc = await asyncio.create_subprocess_exec(
             *args,
@@ -84,8 +91,30 @@ def session_handler(db_file: str):
     return handle
 
 
-async def serve(db_file: str, host: str, port: int, host_key: str) -> None:
-    """Run the SSH server forever."""
+async def sync_forever(db_file: str, sheet_id: str, credentials: str, interval: int) -> None:
+    """Sync with the Google Sheet every ``interval`` seconds; errors are logged, not fatal."""
+    from durst.sheet import SheetClient, locked_sync
+
+    db = DurstDB(db_file=db_file)
+    client = SheetClient(sheet_id, credentials)
+    seen: dict = {}
+    while True:
+        try:
+            for line in await asyncio.to_thread(locked_sync, db, client, seen):
+                print(f"sync: {line}", flush=True)
+        except Exception as e:  # keep serving even if Google is unreachable
+            print(f"sync failed: {e!r}", flush=True)
+        await asyncio.sleep(interval)
+
+
+async def serve(
+    db_file: str,
+    host: str,
+    port: int,
+    host_key: str,
+    sheet: tuple[str, str, int] | None = None,
+) -> None:
+    """Run the SSH server forever (and the sheet sync, given ``(id, credentials, interval)``)."""
     if not os.path.exists(host_key):
         asyncssh.generate_private_key("ssh-ed25519").write_private_key(host_key)
     db = DurstDB(db_file=db_file)
@@ -99,4 +128,6 @@ async def serve(db_file: str, host: str, port: int, host_key: str) -> None:
         line_editor=False,
     )
     print(f"durst listening on {host}:{port}", flush=True)
+    if sheet:
+        await sync_forever(db_file, *sheet)
     await asyncio.Future()
