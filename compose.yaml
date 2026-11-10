@@ -1,0 +1,8 @@
+services:
+  durst:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "22:2222" # `ssh <host>` just works; use e.g. "2222:2222" if the host's sshd owns 22
+    volumes:
+      - ./data:/data

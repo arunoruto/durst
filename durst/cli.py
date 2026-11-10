@@ -68,6 +68,7 @@ def parse_item(raw: str) -> tuple[str, float, int]:
     "db_file",
     default="sqlite.db",
     show_default=True,
+    envvar="DURST_DB",
     help="Location of the database",
 )
 @click.pass_context
@@ -105,6 +106,19 @@ def user_add(db: DurstDB, name: str, email: str) -> None:
         )
     user_id = db.add_user(name, email, verbose=False)
     click.echo(f"Added user {name} <{email}> (id={user_id})")
+
+
+@user.command("key")
+@click.argument("name")
+@click.argument("key")
+@click.pass_obj
+def user_key(db: DurstDB, name: str, key: str) -> None:
+    """Let NAME log in over SSH with public KEY ('ssh-ed25519 AAAA...')."""
+    try:
+        db.add_ssh_key(resolve_user_id(db, name), key)
+    except ValueError as e:
+        raise click.ClickException(str(e))
+    click.echo(f"Added SSH key for {name}.")
 
 
 @user.command("list")
@@ -325,6 +339,28 @@ def debts(db: DurstDB) -> None:
             for d in rows
         ],
     )
+
+
+#################################
+#          SSH Server           #
+#################################
+@cli.command()
+@click.option("--host", default="0.0.0.0", show_default=True)
+@click.option("--port", default=2222, show_default=True, type=int)
+@click.option(
+    "--host-key",
+    default="ssh_host_key",
+    show_default=True,
+    help="Server host key; generated on first start",
+)
+@click.pass_obj
+def serve(db: DurstDB, host: str, port: int, host_key: str) -> None:
+    """Serve the TUI over SSH (registered keys can buy, others are guests)."""
+    import asyncio
+
+    from durst.ssh import serve as ssh_serve
+
+    asyncio.run(ssh_serve(db.db_file, host, port, host_key))
 
 
 if __name__ == "__main__":

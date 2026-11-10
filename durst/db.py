@@ -138,6 +138,14 @@ class Repayment(BaseModel):
         )
 
 
+def _normalize_key(key: str) -> str:
+    """Strip the comment from an OpenSSH public key line."""
+    parts = key.split()
+    if len(parts) < 2:
+        raise ValueError("Expected an OpenSSH public key like 'ssh-ed25519 AAAA...'")
+    return " ".join(parts[:2])
+
+
 #################################
 #     Database Manager Class    #
 #################################
@@ -261,6 +269,14 @@ class DurstDB(BaseModel):
                 FOREIGN KEY (payer_id) REFERENCES users(user_id),
                 -- Links to the user who is receiving money
                 FOREIGN KEY (receiver_id) REFERENCES users(user_id)
+            );
+        """)
+        # 7. ssh_keys: public keys that let a user log in over SSH.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS ssh_keys (
+                key TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(user_id)
             );
         """)
         con.commit()
@@ -434,6 +450,25 @@ class DurstDB(BaseModel):
         if res is None:
             raise ValueError(f"User ID {user_id} not found.")
         return res[0]
+
+    def add_ssh_key(self, user_id: int, key: str) -> None:
+        """Register an OpenSSH public key (``type base64 [comment]``) for a user."""
+        with self._get_connection() as con:
+            con.execute(
+                "INSERT OR REPLACE INTO ssh_keys (key, user_id) VALUES (?, ?)",
+                (_normalize_key(key), user_id),
+            )
+
+    def get_user_by_ssh_key(self, key: str) -> User | None:
+        """Return the user owning an OpenSSH public key, or None."""
+        con = self._get_connection()
+        res = con.execute(
+            "SELECT u.user_id, u.name, u.email, u.balance FROM users u"
+            " JOIN ssh_keys k ON k.user_id = u.user_id WHERE k.key = ?",
+            (_normalize_key(key),),
+        ).fetchone()
+        con.close()
+        return User.from_db_row(res) if res else None
 
     ##########################################
     #        Drink Type Operations           #

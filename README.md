@@ -156,41 +156,35 @@ Before you begin, ensure you have the following installed:
 
 ## Usage
 
-Here are some examples of how to use durst:
+### Hosting (Docker)
 
-### Basic Usage
-
-```python
-# Example: Add a soft drink transaction
-from durst import Transaction
-
-# Create a new transaction
-transaction = Transaction(
-    drink_name="Cola",
-    quantity=2,
-    price=2.50,
-    user="john_doe"
-)
-transaction.save()
+```sh
+docker compose up -d --build   # serves the TUI over SSH; data + host key live in ./data
 ```
 
-### Advanced Usage
+Then anyone can connect, no account needed:
 
-```python
-# Example: Generate a report
-from durst import Report
-
-# Generate monthly consumption report
-report = Report.generate_monthly_report(month=10, year=2025)
-print(report.summary())
+```sh
+ssh drinks.example.org         # any username works
 ```
 
-<!-- TODO: Add more usage examples as the project develops -->
-<!-- TODO: Add screenshots of the application in action -->
+A registered SSH key logs you in as yourself and lets you buy drinks. Any other key (or none) gets a read-only guest view.
 
-_For more examples and detailed documentation, please refer to the [Documentation](https://github.com/arunoruto/durst/wiki)_
+### Administration
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+Run the CLI inside the container (it uses `/data/durst.db` via `DURST_DB`):
+
+```sh
+alias durst='docker compose exec durst durst'
+durst user add Alice alice@example.org
+durst user key Alice "$(cat alice_id_ed25519.pub)"   # repeat for each of her keys
+durst drink add Mate --brand "Club-Mate"
+durst stock add Alice -i Mate:1.20:20                # Alice paid for 20 Mate at 1.20 €
+durst repay Bob Alice 5                              # Bob paid Alice 5 € in cash
+durst debts
+```
+
+`durst --help` lists everything. Running `durst` without a subcommand opens the TUI locally with full admin rights.
 
 <!-- ROADMAP -->
 

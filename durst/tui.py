@@ -44,6 +44,7 @@ class BuyScreen(ModalScreen[tuple[str, str] | None]):
             yield Select(
                 [(name, name) for name in self.users],
                 prompt="Who is drinking?",
+                value=self.users[0] if len(self.users) == 1 else Select.BLANK,
                 id="buy-user",
             )
             yield Select(
@@ -100,6 +101,7 @@ class DurstApp(App):
 
     TITLE = "Durst"
     SUB_TITLE = "Prost! 🍻"
+    ENABLE_COMMAND_PALETTE = False
 
     BINDINGS = [
         Binding("q", "quit", "Quit"),
@@ -140,9 +142,26 @@ class DurstApp(App):
     }
     """
 
-    def __init__(self, db_file: str = "sqlite.db"):
+    def __init__(
+        self, db_file: str = "sqlite.db", user: str | None = None, guest: bool = False
+    ):
+        """Run as local admin (default), as one logged-in ``user``, or as a read-only ``guest``."""
         super().__init__()
         self.db_file = db_file
+        self.user = user
+        self.guest = guest
+        if guest:
+            self.sub_title = "Guest (read-only) · register your SSH key to buy"
+        elif user:
+            self.sub_title = f"Logged in as {user} · Prost! 🍻"
+
+    def check_action(self, action: str, parameters: tuple) -> bool | None:
+        """Guests can't buy; SSH users can't add users."""
+        if action == "buy":
+            return not self.guest
+        if action == "add_user":
+            return not (self.guest or self.user)
+        return True
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
@@ -233,7 +252,7 @@ class DurstApp(App):
     ##########################################
     def action_buy(self) -> None:
         """Open the buy dialog."""
-        users = [u.name for u in self.db.get_all_users()]
+        users = [self.user] if self.user else [u.name for u in self.db.get_all_users()]
         drinks = [
             s["drink_name"]
             for s in self.db.get_stock_status()
@@ -285,4 +304,8 @@ class DurstApp(App):
 
 
 if __name__ == "__main__":
-    DurstApp().run()
+    # Entry point for SSH sessions: `python -m durst.tui DB [USER]`, no USER = guest.
+    import sys
+
+    user = sys.argv[2] if len(sys.argv) > 2 else None
+    DurstApp(sys.argv[1], user=user, guest=user is None).run()
