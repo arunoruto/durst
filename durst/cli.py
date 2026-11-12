@@ -459,5 +459,17 @@ def serve(
     asyncio.run(ssh_serve(db.db_file, host, port, host_key, sheet))
 
 
+@cli.command()
+@click.option("--host", default="0.0.0.0", show_default=True)
+@click.option("--port", default=8050, show_default=True, type=int)
+@click.pass_obj
+def web(db: DurstDB, host: str, port: int) -> None:
+    """Serve the read-only web dashboard."""
+    from durst.web import make_app
+
+    # ponytail: Flask's threaded server is plenty for one department; use gunicorn if it isn't.
+    make_app(db.db_file).run(host=host, port=port, debug=False)
+
+
 if __name__ == "__main__":
     cli()

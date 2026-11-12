@@ -57,8 +57,24 @@ def _make_ctty() -> None:
     fcntl.ioctl(0, termios.TIOCSCTTY, 0)
 
 
+def login_link(db: DurstDB, user: str | None) -> str:
+    """What ``ssh … login`` prints: a one-time link into the web UI."""
+    base = os.environ.get("DURST_WEB_URL", "").rstrip("/")
+    uid = db.get_user_id_by_name(user) if user else None
+    if not base:
+        return "The web UI isn't set up here (DURST_WEB_URL)."
+    if uid is None:
+        return "Your key isn't approved yet. Run ssh without 'login' to register."
+    return f"Open this within 10 minutes to log in (works once):\n\n  {base}/login/{db.login_token(uid)}\n"
+
+
 def session_handler(db_file: str):
     async def handle(process: asyncssh.SSHServerProcess) -> None:
+        if (process.command or "").strip() == "login":
+            text = login_link(DurstDB(db_file=db_file), process.get_extra_info("durst_user"))
+            process.stdout.write((text + "\n").replace("\n", "\r\n").encode())
+            process.exit(0)
+            return
         term = process.get_terminal_type()
         if not term:
             process.stdout.write(b"durst needs a terminal, try: ssh -t\r\n")
@@ -68,7 +84,7 @@ def session_handler(db_file: str):
         user = process.get_extra_info("durst_user")
         key = process.get_extra_info("durst_key")
         args = [sys.executable, "-m", "durst.tui", db_file]
-        args += ["--user", user] if user else ["--key", key] if key else []
+        args += (["--user", user] if user else []) + (["--key", key] if key else [])
         master, slave = pty.openpty()
         proc = await asyncio.create_subprocess_exec(
             *args,

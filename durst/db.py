@@ -1,3 +1,6 @@
+import base64
+import datetime as dt
+import secrets
 import sqlite3
 from sqlite3 import Error
 from typing import Any
@@ -8,6 +11,17 @@ DB_FILE = "sqlite.db"
 POT = "Kasse"  # the shared pot: pays sheet orders, receives deposits
 NOW = "(datetime('now', 'localtime'))"
 USER_COLS = "user_id, name, email, balance, role, approved"
+UNDO_WINDOW = dt.timedelta(minutes=15)  # users may undo their own drinks this long
+LOGIN_TTL = dt.timedelta(minutes=10)  # web login links from `ssh … login`
+
+
+def can_undo(purchase: dict, user: str | None, admin: bool) -> bool:
+    """Admins undo any durst purchase, users their own for UNDO_WINDOW after typing it in."""
+    if purchase.get("sheet_key"):
+        return False
+    entered = purchase.get("entered") or purchase["purchase_date"]
+    age = dt.datetime.now() - dt.datetime.fromisoformat(entered)
+    return admin or (purchase["user_name"] == user and age <= UNDO_WINDOW)
 
 
 #################################
@@ -151,11 +165,24 @@ class Repayment(BaseModel):
 
 
 def _normalize_key(key: str) -> str:
-    """Strip the comment from an OpenSSH public key line."""
+    """Validate an OpenSSH public key line and strip its comment."""
     parts = key.split()
+    bad = ValueError("Expected an OpenSSH public key like 'ssh-ed25519 AAAA... laptop'")
     if len(parts) < 2:
-        raise ValueError("Expected an OpenSSH public key like 'ssh-ed25519 AAAA...'")
+        raise bad
+    try:
+        blob = base64.b64decode(parts[1], validate=True)
+    except ValueError:
+        raise bad from None
+    n = int.from_bytes(blob[:4], "big")
+    if blob[4 : 4 + n].decode(errors="replace") != parts[0]:  # blob starts with its type
+        raise bad
     return " ".join(parts[:2])
+
+
+def _key_label(key: str) -> str:
+    """The comment of a public key line ("laptop"), if any."""
+    return " ".join(key.split()[2:])[:40]
 
 
 #################################
@@ -176,9 +203,19 @@ class DurstDB(BaseModel):
         """
         self.setup_database()
 
+    @property
+    def db_id(self) -> str:
+        """Random id of this database (hex), set when it is created."""
+        con = self._get_connection()
+        v = con.execute("PRAGMA user_version").fetchone()[0]
+        con.close()
+        return f"{v:x}"
+
     def _get_connection(self) -> sqlite3.Connection:
-        """Get a database connection."""
-        return sqlite3.connect(self.db_file)
+        """Get a database connection (WAL: cheap commits, readers never block)."""
+        con = sqlite3.connect(self.db_file, timeout=30)
+        con.execute("PRAGMA synchronous = NORMAL")
+        return con
 
     def setup_database(self):
         """
@@ -203,6 +240,10 @@ class DurstDB(BaseModel):
         """
 
         con = self._get_connection()
+        con.execute("PRAGMA journal_mode = WAL")
+        if not con.execute("PRAGMA user_version").fetchone()[0]:
+            # random id telling databases apart in the sheet sync
+            con.execute(f"PRAGMA user_version = {secrets.randbelow(2**31 - 1) + 1}")
         cur = con.cursor()
         # 1. users: Stores user information and their credit balance.
         cur.execute("""
@@ -296,9 +337,37 @@ class DurstDB(BaseModel):
                 key TEXT PRIMARY KEY,
                 user_id INTEGER NOT NULL,
                 approved INTEGER NOT NULL DEFAULT 1,
+                label TEXT NOT NULL DEFAULT '',
                 FOREIGN KEY (user_id) REFERENCES users(user_id)
             );
         """)
+        # 8. deposit_requests: money a user says they handed in, until an admin confirms it.
+        cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS deposit_requests (
+                request_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                amount REAL NOT NULL CHECK (amount > 0),
+                created TIMESTAMP NOT NULL DEFAULT {NOW},
+                FOREIGN KEY (user_id) REFERENCES users(user_id)
+            );
+        """)
+        # 9. login_tokens: one-time web login links
+        cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS login_tokens (
+                token TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                created TIMESTAMP NOT NULL DEFAULT {NOW},
+                FOREIGN KEY (user_id) REFERENCES users(user_id)
+            );
+        """)
+        if "received_by" not in {c[1] for c in cur.execute("PRAGMA table_info(repayments)")}:
+            # the admin who took the cash for the Kasse
+            cur.execute("ALTER TABLE repayments ADD COLUMN received_by INTEGER REFERENCES users(user_id)")
+        if "entered" not in {c[1] for c in cur.execute("PRAGMA table_info(drink_purchases)")}:
+            # when it was typed in; purchase_date can be earlier for drinks booked late
+            cur.execute("ALTER TABLE drink_purchases ADD COLUMN entered TIMESTAMP")
+        if "label" not in {c[1] for c in cur.execute("PRAGMA table_info(ssh_keys)")}:
+            cur.execute("ALTER TABLE ssh_keys ADD COLUMN label TEXT NOT NULL DEFAULT ''")
         cur.execute("INSERT OR IGNORE INTO users (name, role) VALUES (?, 'pot')", (POT,))
         con.commit()
         con.close()
@@ -483,12 +552,44 @@ class DurstDB(BaseModel):
         return res[0]
 
     def add_ssh_key(self, user_id: int, key: str, approved: bool = True) -> None:
-        """Register an OpenSSH public key (``type base64 [comment]``) for a user."""
+        """Register an OpenSSH public key (``type base64 [comment]``) for a user.
+
+        Raises ValueError for a malformed key or one that belongs to someone else.
+        """
+        normalized = _normalize_key(key)
+        with self._get_connection() as con:
+            owner = con.execute(
+                "SELECT user_id FROM ssh_keys WHERE key = ?", (normalized,)
+            ).fetchone()
+            if owner and owner[0] != user_id:
+                raise ValueError("That key is already registered to another account.")
+            con.execute(
+                "INSERT OR REPLACE INTO ssh_keys (key, user_id, approved, label) VALUES (?, ?, ?, ?)",
+                (normalized, user_id, int(approved), _key_label(key)),
+            )
+
+    def get_ssh_keys(self, user_id: int) -> list[dict]:
+        """A user's keys (approved first), as ``{key, label, approved}``."""
+        return self._rows(
+            "SELECT key, label, approved FROM ssh_keys WHERE user_id = ? ORDER BY approved DESC, label",
+            (user_id,),
+        )
+
+    def remove_ssh_key(self, user_id: int, key: str) -> None:
+        """Remove one of a user's own keys."""
         with self._get_connection() as con:
             con.execute(
-                "INSERT OR REPLACE INTO ssh_keys (key, user_id, approved) VALUES (?, ?, ?)",
-                (_normalize_key(key), user_id, int(approved)),
+                "DELETE FROM ssh_keys WHERE user_id = ? AND key = ?", (user_id, _normalize_key(key))
             )
+
+    def set_email(self, user_id: int, email: str | None) -> None:
+        """Change a user's email (None clears it)."""
+        if email and "@" not in email:
+            raise ValueError("That doesn't look like an email.")
+        if email and (other := self.get_user_by_email(email)) and other.user_id != user_id:
+            raise ValueError(f"The email {email} is already taken.")
+        with self._get_connection() as con:
+            con.execute("UPDATE users SET email = ? WHERE user_id = ?", (email or None, user_id))
 
     def get_user_by_ssh_key(self, key: str) -> User | None:
         """Return the user owning an OpenSSH public key, or None."""
@@ -793,45 +894,64 @@ class DurstDB(BaseModel):
             # The 'with conn:' block handles the rollback automatically
             return None
 
+    def restock(self, drink: str, qty: int, total: float, payer: str) -> str:
+        """Stock ``qty`` bottles bought for ``total`` by ``payer`` (a name or the Kasse).
+
+        A drink spelled like an existing one in another case is that one; any
+        other new name adds a drink. Returns the drink's name as stored.
+        """
+        drink = drink.strip()
+        if not drink:
+            raise ValueError("Which drink?")
+        if qty <= 0 or total < 0:
+            raise ValueError("Bottles must be positive and the price can't be negative.")
+        payer_id = self.get_user_id_by_name(payer)
+        if payer_id is None:
+            raise ValueError(f"Nobody called {payer!r}.")
+        names = {d.name.lower(): d.name for d in self.get_all_drink_types()}
+        drink = names.get(drink.lower(), drink)
+        drink_id = self.add_drink_type(drink, verbose=False)
+        assert drink_id is not None
+        item = {"drink_type_id": drink_id, "cost_per_item": total / qty, "quantity": qty}
+        if self.stock_new_drinks(payer_id, total, [item], verbose=False) is None:
+            raise ValueError("Could not save the order.")
+        return drink
+
     ##########################################
     #        Purchase Operations             #
     ##########################################
     def add_purchase(self, user: str, drink: str) -> int:
-        """Add a purchase record for a user buying a drink from the oldest available stock batch.
+        """Book one drink for ``user`` from the oldest batch with stock; returns its purchase_id."""
+        return self.add_purchases(user, [drink])[0]
 
-        This function:
-        - Looks up the purchaser and drink type by name.
-        - Selects the oldest stock batch for the requested drink type that has remaining stock.
-        - Inserts a row into drink_purchases linking the purchaser to the batch and recording the cost.
-        - Decrements the remaining quantity on the selected stock batch.
-        - Updates balances: subtracts the cost from the purchaser and credits the orderer who paid for the batch.
-        - Uses a single SQLite transaction (context manager) so all changes commit together or roll back on error.
+    def add_purchases(self, user: str, drinks: list[str], day: dt.date | None = None) -> list[int]:
+        """Book several drinks at once, all or nothing.
 
-        Args:
-            user (str): Purchaser's name.
-            drink (str): Drink type name.
-
-        Returns:
-            int: The newly inserted purchase_id from the drink_purchases table.
+        ``day`` books them for an earlier day (someone forgot to); they land at
+        noon of that day, since nobody remembers the hour.
 
         Raises:
-            ValueError: If the purchaser name or drink type name cannot be resolved to an ID, or if no stock is available for the requested drink.
-            sqlite3.Error: If inserting the purchase or updating the database fails.
-
-        Notes:
-            - The batch selection uses ORDER BY date_added ASC and LIMIT 1 to pick the oldest available batch with remaining_qty > 0.
-            - Concurrency: SQLite uses coarse-grained locking; concurrent calls may need retry logic or a different DB for high concurrency scenarios.
+            ValueError: unknown user or drink, nothing to book, a future day,
+                or not enough stock.
         """
         purchaser_id = self.get_user_id_by_name(user)
         if purchaser_id is None:
             raise ValueError(f"User not found: {user}")
-
-        drink_type_id = self.get_drink_type_id_by_name(drink)
-        if drink_type_id is None:
-            raise ValueError(f"Drink type not found: {drink}")
-
+        if not drinks:
+            raise ValueError("Nothing to book.")
+        today = dt.date.today()
+        if day and day > today:
+            raise ValueError("That day hasn't happened yet.")
+        date = f"{day} 12:00:00" if day and day != today else None
+        ids = []
+        for drink in drinks:
+            drink_type_id = self.get_drink_type_id_by_name(drink)
+            if drink_type_id is None:
+                raise ValueError(f"Drink type not found: {drink}")
+            ids.append(drink_type_id)
         with self._get_connection() as conn:
-            return self._take(conn.cursor(), purchaser_id, drink_type_id)
+            cur = conn.cursor()
+            return [self._take(cur, purchaser_id, d, date=date) for d in ids]
 
     def import_purchases(
         self,
@@ -892,8 +1012,8 @@ class DurstDB(BaseModel):
         cur.execute(
             f"""
             INSERT INTO drink_purchases
-                (user_id, batch_id, cost, charged_to_orderer_id, purchase_date, sheet_key)
-            VALUES (?, ?, ?, ?, COALESCE(?, {NOW}), ?)
+                (user_id, batch_id, cost, charged_to_orderer_id, purchase_date, sheet_key, entered)
+            VALUES (?, ?, ?, ?, COALESCE(?, {NOW}), ?, {NOW})
             """,
             (user_id, batch_id, cost, orderer_id, date, sheet_key),
         )
@@ -914,68 +1034,107 @@ class DurstDB(BaseModel):
     #        Repayment Operations            #
     ##########################################
     def add_repayment(
-        self, payer_id: int, receiver_id: int, amount: float, date: str | None = None
+        self,
+        payer_id: int,
+        receiver_id: int,
+        amount: float,
+        date: str | None = None,
+        received_by: int | None = None,
     ) -> int:
-        """Record a repayment and update user balances.
-
-        Inserts a row into repayments and adjusts the payer's and receiver's balances within a single transaction. Returns the new repayment_id.
+        """Record a repayment and update both balances; returns the repayment_id.
 
         The payer hands cash to the receiver, settling debt: the payer's balance
         increases (toward zero) and the receiver's balance decreases, since they
-        are owed that much less.
-
-        Args:
-            payer_id (int): The user_id of the person making the payment.
-            receiver_id (int): The user_id of the person receiving the payment.
-            amount (float): The amount being repaid.
-
-        Returns:
-            int: The new repayment_id.
+        are owed that much less. ``received_by`` is the admin who took the cash
+        when the receiver is the Kasse.
 
         Raises:
             ValueError: if payer/receiver not found or amount is non-positive.
-            sqlite3.Error: on DB errors.
         """
+        with self._get_connection() as conn:
+            return self._repay(conn.cursor(), payer_id, receiver_id, amount, date, received_by)
+
+    @staticmethod
+    def _repay(
+        cur: sqlite3.Cursor,
+        payer_id: int,
+        receiver_id: int,
+        amount: float,
+        date: str | None = None,
+        received_by: int | None = None,
+    ) -> int:
         if amount <= 0:
             raise ValueError("Amount must be positive")
-
         if payer_id == receiver_id:
             raise ValueError("Payer and receiver must be different users")
-
-        with self._get_connection() as conn:
-            cur = conn.cursor()
-
-            # Verify payer exists
-            cur.execute("SELECT 1 FROM users WHERE user_id = ?", (payer_id,))
-            if not cur.fetchone():
-                raise ValueError(f"Payer not found: {payer_id}")
-
-            # Verify receiver exists
-            cur.execute("SELECT 1 FROM users WHERE user_id = ?", (receiver_id,))
-            if not cur.fetchone():
-                raise ValueError(f"Receiver not found: {receiver_id}")
-
-            # Insert repayment record
-            cur.execute(
-                "INSERT INTO repayments (payer_id, receiver_id, amount, payment_date)"
-                f" VALUES (?, ?, ?, COALESCE(?, {NOW}))",
-                (payer_id, receiver_id, amount, date),
-            )
-            repayment_id = cur.lastrowid
-            if repayment_id is None:
-                raise sqlite3.Error("Failed to record repayment")
-
-            # Update balances: the payer settled debt, the receiver is owed less
-            cur.execute(
-                "UPDATE users SET balance = balance + ? WHERE user_id = ?",
-                (amount, payer_id),
-            )
-            cur.execute(
-                "UPDATE users SET balance = balance - ? WHERE user_id = ?",
-                (amount, receiver_id),
-            )
-
+        for who, uid in (("Payer", payer_id), ("Receiver", receiver_id)):
+            if not cur.execute("SELECT 1 FROM users WHERE user_id = ?", (uid,)).fetchone():
+                raise ValueError(f"{who} not found: {uid}")
+        cur.execute(
+            "INSERT INTO repayments (payer_id, receiver_id, amount, payment_date, received_by)"
+            f" VALUES (?, ?, ?, COALESCE(?, {NOW}), ?)",
+            (payer_id, receiver_id, amount, date, received_by),
+        )
+        repayment_id = cur.lastrowid
+        if repayment_id is None:
+            raise sqlite3.Error("Failed to record repayment")
+        cur.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (amount, payer_id))
+        cur.execute("UPDATE users SET balance = balance - ? WHERE user_id = ?", (amount, receiver_id))
         return repayment_id
+
+    def request_deposit(self, user_id: int, amount: float) -> None:
+        """A user says they handed in cash; it counts once an admin approves it."""
+        if not 0 < amount <= 1000:
+            raise ValueError("Enter an amount between 0 and 1000 €.")
+        with self._get_connection() as con:
+            con.execute(
+                "INSERT INTO deposit_requests (user_id, amount) VALUES (?, ?)",
+                (user_id, round(amount, 2)),
+            )
+
+    def get_deposit_requests(self, user_id: int | None = None) -> list[dict]:
+        """Deposits waiting for an admin (only ``user_id``'s, if given), oldest first."""
+        return self._rows(
+            "SELECT r.request_id, r.amount, r.created, u.name, u.email FROM deposit_requests r"
+            " JOIN users u ON u.user_id = r.user_id"
+            " WHERE ? IS NULL OR r.user_id = ? ORDER BY r.request_id",
+            (user_id, user_id),
+        )
+
+    def approve_deposit(self, request_id: int, admin_id: int | None) -> None:
+        """Book a requested deposit into the Kasse, received by ``admin_id``."""
+        pot = self.pot_id()
+        with self._get_connection() as con:
+            cur = con.cursor()
+            row = cur.execute(
+                "SELECT user_id, amount FROM deposit_requests WHERE request_id = ?", (request_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError("That request is gone already.")
+            cur.execute("DELETE FROM deposit_requests WHERE request_id = ?", (request_id,))
+            self._repay(cur, row[0], pot, row[1], received_by=admin_id)
+
+    def login_token(self, user_id: int) -> str:
+        """A one-time token for a web login link."""
+        token = secrets.token_urlsafe(24)
+        with self._get_connection() as con:
+            con.execute("INSERT INTO login_tokens (token, user_id) VALUES (?, ?)", (token, user_id))
+        return token
+
+    def use_login_token(self, token: str) -> int | None:
+        """The user a fresh token belongs to; every token works once."""
+        oldest = (dt.datetime.now() - LOGIN_TTL).strftime("%Y-%m-%d %H:%M:%S")
+        with self._get_connection() as con:
+            row = con.execute(
+                "SELECT user_id FROM login_tokens WHERE token = ? AND created >= ?", (token, oldest)
+            ).fetchone()
+            con.execute("DELETE FROM login_tokens WHERE token = ? OR created < ?", (token, oldest))
+        return row[0] if row else None
+
+    def reject_deposit(self, request_id: int) -> None:
+        """Drop a deposit request (also how a user withdraws their own)."""
+        with self._get_connection() as con:
+            con.execute("DELETE FROM deposit_requests WHERE request_id = ?", (request_id,))
 
     ##########################################
     #        Query & Reporting Methods       #
@@ -995,17 +1154,19 @@ class DurstDB(BaseModel):
             """
             SELECT
                 dp.purchase_id,
+                dp.sheet_key,
                 u.name as user_name,
                 dt.name as drink_name,
                 dp.cost,
                 dp.purchase_date,
+                dp.entered,
                 orderer.name as orderer_name
             FROM drink_purchases dp
             JOIN users u ON dp.user_id = u.user_id
             JOIN stock_batches sb ON dp.batch_id = sb.batch_id
             JOIN drink_types dt ON sb.drink_type_id = dt.drink_type_id
             JOIN users orderer ON dp.charged_to_orderer_id = orderer.user_id
-            ORDER BY dp.purchase_date DESC
+            ORDER BY dp.purchase_date DESC, dp.purchase_id DESC
             LIMIT ?
         """,
             (limit,),
@@ -1016,6 +1177,39 @@ class DurstDB(BaseModel):
         con.close()
 
         return [dict(zip(columns, row)) for row in rows]
+
+    def last_taken(self, user_id: int) -> list[str]:
+        """The drinks a user has taken, most recent first."""
+        rows = self._rows(
+            "SELECT d.name AS drink FROM drink_purchases p"
+            " JOIN stock_batches b ON b.batch_id = p.batch_id"
+            " JOIN drink_types d ON d.drink_type_id = b.drink_type_id"
+            " WHERE p.user_id = ? GROUP BY d.name"
+            " ORDER BY MAX(p.purchase_date) DESC, MAX(p.purchase_id) DESC",
+            (user_id,),
+        )
+        return [r["drink"] for r in rows]
+
+    def undo_purchase(self, purchase_id: int) -> None:
+        """Reverse a purchase made in durst: the bottle goes back, balances too."""
+        with self._get_connection() as con:
+            row = con.execute(
+                "SELECT user_id, batch_id, cost, charged_to_orderer_id, sheet_key"
+                " FROM drink_purchases WHERE purchase_id = ?",
+                (purchase_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("That purchase is gone already.")
+            user_id, batch_id, cost, orderer_id, sheet_key = row
+            if sheet_key:  # the sheet would just bring it back
+                raise ValueError("That one came from the sheet; it can't be undone here.")
+            con.execute("DELETE FROM drink_purchases WHERE purchase_id = ?", (purchase_id,))
+            con.execute(
+                "UPDATE stock_batches SET remaining_qty = remaining_qty + 1 WHERE batch_id = ?",
+                (batch_id,),
+            )
+            con.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (cost, user_id))
+            con.execute("UPDATE users SET balance = balance - ? WHERE user_id = ?", (cost, orderer_id))
 
     def get_stock_status(self) -> list[dict]:
         """Get current stock status for all drink types.

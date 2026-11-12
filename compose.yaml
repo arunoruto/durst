@@ -1,15 +1,33 @@
 services:
   durst:
+    image: ghcr.io/arunoruto/durst:edge  # built from main by CI; `--build` builds it here instead
     build: .
     restart: unless-stopped
     ports:
       - "22:2222" # `ssh <host>` just works; use e.g. "2222:2222" if the host's sshd owns 22
     environment:
       TZ: Europe/Berlin
+      DURST_WEB_URL: http://<host>:8050  # `ssh <host> login` prints links to it
       # Two-way sync with the legacy Google Sheet; drop the service account key
       # into ./data and restart. Without the key file, sync stays off.
       # DURST_SHEET_ID: 19nEaGZPfE3LkqPre24MjYqnt-ZqwSqrPoAS87Yccy8k
       GOOGLE_APPLICATION_CREDENTIALS: /data/google-service-account.json
+    volumes:
+      - ./data:/data
+      - /etc/localtime:/etc/localtime:ro
+
+  # The web UI on http://<host>:8050
+  web:
+    image: ghcr.io/arunoruto/durst:edge
+    build: .
+    restart: unless-stopped
+    command: durst web
+    ports:
+      - "8050:8050"
+    environment:
+      TZ: Europe/Berlin
+      DURST_SSH: ssh <host>  # shown on the page
+      DURST_WEB_URL: http://<host>:8050
     volumes:
       - ./data:/data
       - /etc/localtime:/etc/localtime:ro

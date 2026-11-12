@@ -159,8 +159,10 @@ Before you begin, ensure you have the following installed:
 ### Hosting (Docker)
 
 ```sh
-docker compose up -d --build   # serves the TUI over SSH; data + host key live in ./data
+docker compose up -d           # serves the TUI over SSH; data + host key live in ./data
 ```
+
+CI tests every push and publishes the image to `ghcr.io/arunoruto/durst`: `:edge` follows `main`, a `v1.2.3` tag adds `:1.2.3` and `:latest`. Add `--build` to build from your checkout instead. To update automatically, let a tool like Tugtainer or Watchtower watch `:edge`.
 
 Then anyone can connect, no account needed:
 
@@ -172,7 +174,23 @@ ssh drinks.example.org         # any username works
 - **Unknown key**: read-only guest view; press `r` to register. Pick a new name or the name you already have in the sheet to take over that account. An admin approves you in the *Approvals* tab.
 - **No key**: read-only guest view.
 
-Keys: `j/k` up/down, `g/G` top/bottom, `h/l` or `←/→` switch tabs, `1-4` jump to a tab, `b` buy, `?` full help, `q` quit.
+Keys: `j/k` up/down, `g/G` top/bottom, `h/l` or `←/→` switch tabs, `1-6` jump to a tab, `?` full help, `q` quit.
+
+- `b` buy: your most recent drinks come first.
+  Type a number first to take several: `3⏎` books three.
+- `c` catch up: forgot to book? Pick the day (`yesterday`, `3.11.`), then tally the drinks until `esc`.
+- `u` undo a drink in *History*. Users can undo their own drinks for 15 minutes after entering them; admins can undo any drink made in durst.
+- *Stats*: drinks per week, top drinks, the thirstiest people, and your own numbers.
+- *Me*: your SSH keys (`n` add, `d` remove) and email (`e`).
+- Admins only: `o` restock in *Drinks* (a new name adds a new drink), `p` deposit or payout for the selected person in *Balances*, and approvals.
+
+- `p` in *Me*: add money you gave an admin. It counts once an admin confirms it in *Approvals*.
+
+### Web UI
+
+`durst web` (port 8050) serves the same app in the browser: buy, undo, your keys and email, deposits, catching up on forgotten drinks ("Forgot to book?" on the Drinks page), and for admins approvals, restocking and bookings. Plus Plotly charts. It's built with Dash and styled with Tailwind.
+
+Log in with `ssh <host> login`. It prints a one-time link (valid for 10 minutes), and the browser then stays logged in for 90 days. Without a login you get the read-only guest view. Set `DURST_WEB_URL` (the public URL of the web UI) on the SSH service so it can print those links.
 
 ### Administration
 

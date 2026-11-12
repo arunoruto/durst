@@ -45,3 +45,16 @@ def test_guest_cannot_buy(tmp_path):
             assert not app.check_action("approve", ())
 
     asyncio.run(run())
+
+
+def test_login_link(tmp_path, monkeypatch):
+    from durst.ssh import login_link
+
+    db = DurstDB(db_file=str(tmp_path / "t.db"))
+    db.add_user("Alice", verbose=False)
+    monkeypatch.setenv("DURST_WEB_URL", "https://durst.example/")
+    link = login_link(db, "Alice")
+    token = link.split("/login/")[1].strip()
+    assert db.use_login_token(token) == db.get_user_id_by_name("Alice")
+    assert db.use_login_token(token) is None  # once only
+    assert "isn't approved" in login_link(db, None)

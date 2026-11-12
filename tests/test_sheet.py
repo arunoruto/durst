@@ -13,6 +13,7 @@ class FakeSheet:
         self.tabs = {t: [list(r) for r in rows] for t, rows in tabs.items()}
         self.formulas: dict[tuple, str] = {}
         self.requests: list[dict] = []
+        self.merges: dict[str, list[dict]] = {}
         self.rules = [
             {"condition": {"values": [{"userEnteredValue": n} for n in names]}},
             {"condition": {"values": [{"userEnteredValue": d} for d in drinks]}},
@@ -67,7 +68,11 @@ class FakeSheet:
                     self.formulas[(tab, r, c1 + i)] = v
 
     def meta(self):
-        return {"locale": "de_DE", "sheet_id": 1, "row_count": 2000, "rules": self.rules}
+        return {
+            "locale": "de_DE", "sheet_id": 1, "row_count": 2000,
+            "rules": self.rules, "merges": self.merges,
+            "tab_ids": {ACCOUNTS: 2, DRINKS: 1, ORDERS: 0},
+        }
 
     def batch_update(self, requests):
         self.requests += requests
@@ -118,9 +123,9 @@ def test_sync_two_way(tmp_path):
         "Club Mate": 37,
         "Wasser": 11,
     }
-    assert sheet.cell(DRINKS, 2, "J").startswith("s")  # stamped with a sync key
+    assert sheet.cell(DRINKS, 2, "Z").startswith("s")  # stamped with a sync key
     assert sheet.cell(ACCOUNTS, 2, "D") == "=B2+E2-C2"
-    assert sheet.cell(ACCOUNTS, 2, "E") == 0
+    assert sheet.cell(ACCOUNTS, 2, "E") == "0 €"
 
     # Idempotent: a second run imports nothing and adds no rows.
     assert sync(db, sheet) == []
@@ -134,9 +139,10 @@ def test_sync_two_way(tmp_path):
     db.add_user("Neu", verbose=False)
     log = sync(db, sheet)
     assert "added 1 drink(s) to sheet" in log
-    assert sheet.tabs[DRINKS][4][:5] == [sheet.cell(DRINKS, 5, "A"), "Tom", "Wasser", 1, 0.62]
-    assert sheet.cell(DRINKS, 5, "J").startswith("p")
-    assert sheet.cell(ACCOUNTS, 2, "E") == 5  # durst-side money shows up in E
+    assert sheet.tabs[DRINKS][4][1:5] == ["Tom", "Wasser", 1, "0,62 €"]
+    assert re.fullmatch(r"\d\d\.\d\d\.\d{4} \d\d:\d\d:\d\d", sheet.cell(DRINKS, 5, "A"))
+    assert sheet.cell(DRINKS, 5, "Z").startswith("p")
+    assert sheet.cell(ACCOUNTS, 2, "E") == "5 €"  # durst-side money shows up in E
     assert sheet.cell(ACCOUNTS, 4, "A") == "Neu"
     assert [v["userEnteredValue"] for v in sheet.rules[0]["condition"]["values"]][-1] == "Neu"
 
@@ -154,3 +160,62 @@ def test_unsettled_rows_wait_one_round(tmp_path):
     assert db.all_purchases() == []  # first sight: not settled yet
     sync(db, sheet, seen)
     assert len(db.all_purchases()) == 4
+
+
+def test_merged_key_cells_are_never_written(tmp_path):
+    """Google drops writes into merged cells; such rows must not loop."""
+    db = DurstDB(db_file=str(tmp_path / "t.db"))
+    sheet = make_sheet()
+    # Row 3's key cell and the free row 5 sit inside merges (0-based indices).
+    sheet.merges[DRINKS] = [
+        {"startRowIndex": 2, "endRowIndex": 3, "startColumnIndex": 24, "endColumnIndex": 26},
+        {"startRowIndex": 4, "endRowIndex": 5, "startColumnIndex": 20, "endColumnIndex": 26},
+    ]
+    log = sync(db, sheet)
+    assert f"{DRINKS} row 3: Z3 is merged, unmerge it to sync this row" in log
+    assert sheet.cell(DRINKS, 3, "Z") == ""
+    db.add_purchase("Tom", "Wasser")
+    sync(db, sheet)
+    assert sheet.cell(DRINKS, 5, "A") == ""  # merged free row skipped
+    assert sheet.cell(DRINKS, 6, "B") == "Tom"  # appended past the end instead
+
+
+def test_rows_from_another_database_are_left_alone(tmp_path):
+    """A reset/restored DB restarts its ids; old durst rows must not count as its own."""
+    sheet = make_sheet()
+    old = DurstDB(db_file=str(tmp_path / "old.db"))
+    sync(old, sheet)
+    old.add_purchase("Tom", "Wasser")
+    sync(old, sheet)
+
+    new = DurstDB(db_file=str(tmp_path / "new.db"))
+    assert new.db_id != old.db_id
+    log = sync(new, sheet)
+    assert "1 row(s) were added by another durst database; ignored" in log
+    new.add_purchase("Kay", "Wasser")  # same purchase id the old DB used
+    assert "added 1 drink(s) to sheet" in sync(new, sheet)
+
+
+def test_future_dates_are_typos(tmp_path):
+    db = DurstDB(db_file=str(tmp_path / "t.db"))
+    sheet = make_sheet()
+    sheet.tabs[DRINKS][2][0] = "19.11.2035"  # meant 2025
+    log = sync(db, sheet)
+    assert "row 3: date 19.11.2035 is in the future, using 05.06.2025" in log
+    assert max(p["purchase_date"] for p in db.all_purchases()) < "2026"
+    assert sync(db, sheet) == []  # reported once, not on every sync
+
+
+def test_undone_purchases_leave_the_sheet(tmp_path):
+    db = DurstDB(db_file=str(tmp_path / "t.db"))
+    sheet = make_sheet()
+    sync(db, sheet)
+    pid = db.add_purchase("Tom", "Wasser")
+    sync(db, sheet)
+    assert sheet.cell(DRINKS, 5, "B") == "Tom"
+    db.undo_purchase(pid)
+    assert "removed undone drink from sheet: Tom Wasser" in sync(db, sheet)
+    assert sheet.cell(DRINKS, 5, "B") == "" and sheet.cell(DRINKS, 5, "Z") == ""
+    imported = next(p for p in db.all_purchases() if p["sheet_key"])
+    with pytest.raises(ValueError, match="came from the sheet"):
+        db.undo_purchase(imported["purchase_id"])
