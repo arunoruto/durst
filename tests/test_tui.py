@@ -145,6 +145,17 @@ def test_admin_buys_for_others(db_path):
     assert DurstDB(db_file=db_path).get_user_by_name("Bob").balance == -1.5
 
 
+def test_guest_without_key_learns_to_make_one(db_path):
+    async def steps(app, pilot):
+        await pilot.press("r")
+        await pilot.pause()
+        assert not isinstance(app.screen, FormScreen)
+        assert any("ssh-keygen" in str(n.message) for n in app._notifications)
+
+    run(DurstApp(db_path, guest=True), steps)
+    assert DurstDB(db_file=db_path).get_pending_keys() == []
+
+
 def test_guest_registers_and_admin_approves(db_path):
     async def register(app, pilot):
         assert not app.check_action("buy", ())

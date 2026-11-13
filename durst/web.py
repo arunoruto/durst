@@ -217,7 +217,7 @@ def drinks_page(db: DurstDB, me: User | None, admin: bool) -> list:
                                          persistence=True, persistence_type="session")),
                     html.Datalist([html.Option(value=u) for u in users], id="buy-users"),
                 ],
-                className="mb-4 max-w-xs",
+                className="w-full max-w-xs",
             )
             if admin
             else dcc.Input(id="buy-for", type="hidden", value=me.name)
@@ -267,8 +267,8 @@ def drinks_page(db: DurstDB, me: User | None, admin: bool) -> list:
             "Grab a drink",
             dcc.Store(id="basket", data=None),  # None: one tap books; a dict: catching up
             html.Div(
-                [who, html.Button("Forgot to book? Catch up", id="cu-toggle", className=BTN_GHOST + " mb-4")],
-                className="flex flex-wrap items-end justify-between gap-3",
+                [who, html.Button("Forgot to book? Catch up", id="cu-toggle", className=BTN_GHOST)],
+                className="mb-4 flex flex-wrap items-end justify-between gap-3",
             ),
             html.Div(tiles, className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4")
             if tiles else html.P("Nothing in stock right now.", className="text-neutral-400"),

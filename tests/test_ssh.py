@@ -41,7 +41,7 @@ def test_guest_cannot_buy(tmp_path):
         app = DurstApp(str(tmp_path / "t.db"), guest=True)
         async with app.run_test():
             assert not app.check_action("buy", ())
-            assert not app.check_action("register", ())  # no key, nothing to register
+            assert app.check_action("register", ())  # no key: r explains how to make one
             assert not app.check_action("approve", ())
 
     asyncio.run(run())

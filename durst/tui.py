@@ -468,8 +468,8 @@ class DurstApp(App):
             return (self.is_admin and tab == "balances") or (bool(self.user) and tab == "me")
         if action == "undo":
             return not self.guest and tab == "history"
-        if action == "register":
-            return bool(self.guest and self.key and not self.pending)
+        if action == "register":  # keyless guests too: they learn they need a key
+            return bool(self.guest and not self.pending)
         if action in ("approve", "reject"):
             return self.is_admin and tab == "approvals"
         if action in ("add_key", "remove_key", "edit_email"):
@@ -685,7 +685,7 @@ class DurstApp(App):
         elif self.pending:
             right = Text("⏳ waiting for an admin to approve you", style=YELLOW)
         elif self.guest:
-            right = Text("guest · read-only", style=DIM)
+            right = Text("guest · read-only · r to register", style=DIM)
         else:
             right = Text("local admin", style=DIM)
         right.justify = "right"
@@ -852,6 +852,16 @@ class DurstApp(App):
         self.refresh_data()
 
     def action_register(self) -> None:
+        if self.key is None:
+            self.notify(
+                "You connected without an SSH key, so durst can't recognise you. "
+                "Make one with: ssh-keygen -t ed25519 (Enter for all questions), "
+                "then connect again and press r.",
+                title="You need an SSH key",
+                severity="warning",
+                timeout=30,
+            )
+            return
         taken = {p["name"] for p in self.db.get_pending_keys()}
         accounts = [u.name for u in self.db.get_all_users() if u.name not in taken]
 
